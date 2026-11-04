@@ -1,7 +1,7 @@
 # AuditGate for Jira.
 # `forge register` replaces the placeholder app id below with your own. See docs/SETUP.md.
 app:
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  id: ari:cloud:ecosystem::app/dc6e5d7c-6f3b-4766-af94-425ef105f7a4
   runtime:
     name: nodejs24.x
     memoryMB: 512
