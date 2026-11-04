@@ -309,7 +309,13 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
       }
     }
 
-    const toCreate = findings.filter((f) => !f.jiraKey);
+    // Most severe first, so C-01 gets the lowest issue number.
+    const toCreate = findings
+      .filter((f) => !f.jiraKey)
+      .sort(
+        (a, b) =>
+          compareSeverity(a.severity, b.severity) || a.externalId.localeCompare(b.externalId),
+      );
     const toUpdate = findings.filter((f) => f.jiraKey && needsSync(f));
     status.total = toCreate.length + toUpdate.length;
 

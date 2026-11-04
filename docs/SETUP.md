@@ -32,7 +32,7 @@ forge --version   # 15.x as of 29 Oct 2026
 ## 3. Atlassian accounts and sites
 
 1. Get a free developer site with Jira: open <https://go.atlassian.com/cloud-dev> and follow the steps. Note the site URL, for example `benjamin-dev.atlassian.net`.
-2. Create an API token for the Forge CLI: <https://id.atlassian.com/manage-profile/security/api-tokens> → **Create API token** (the plain one, not "with scopes"). Copy it.
+2. Create a scoped API token for the Forge CLI at <https://id.atlassian.com/manage-profile/security/api-tokens>: **Create API token with scopes**, name it `forge-api-token`, choose the app **Forge**, keep the default recommended scopes, then **Create token** and copy it. Forge CLI 15 rejects plain tokens.
 3. Log in:
 
    ```powershell

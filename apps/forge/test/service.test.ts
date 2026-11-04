@@ -112,6 +112,12 @@ describe("runImport", () => {
     const { jira, store, auditId, deps } = await importedAudit();
     expect(jira.issues).toHaveLength(11);
     expect(jira.bulkCalls).toBe(1);
+    expect(jira.issues.map((i) => i.property.externalId).slice(0, 4)).toEqual([
+      "C-01",
+      "H-01",
+      "H-02",
+      "H-03",
+    ]);
     const c01 = jira.issues.find((i) => i.property.externalId === "C-01");
     expect(c01?.fields).toMatchObject({
       summary: "[C-01] Anyone can set the oracle price",

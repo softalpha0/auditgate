@@ -34,12 +34,12 @@ node --version
 forge --version
 ```
 
-Node must be 22.23 or newer (or 24.x) for Forge CLI 15.
+Use Node 24 (24.22.1 or newer) or Node 22 (22.23.4 or newer). Node 26 is too new for Forge CLI 15. If `corepack` is missing, install pnpm with `npm install -g pnpm@10.28.0`.
 
 ### 3. Atlassian account and site
 
 1. Create a free developer site: <https://go.atlassian.com/cloud-dev>. Note the address, for example `benjamin-dev.atlassian.net`.
-2. Create an API token: <https://id.atlassian.com/manage-profile/security/api-tokens>, **Create API token** (not the "with scopes" one).
+2. Create a scoped API token at <https://id.atlassian.com/manage-profile/security/api-tokens>: **Create API token with scopes**, name it `forge-api-token`, choose the app **Forge**, keep the default recommended scopes, then **Create token** and copy it. Forge CLI 15 rejects plain tokens.
 3. Log in:
 
 ```powershell

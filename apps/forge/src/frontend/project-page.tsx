@@ -394,14 +394,14 @@ const NewAudit = ({ done, cancel }: { done: (id: string) => void; cancel: () => 
             id="name"
             label="Audit name"
             value={form.name}
-            placeholder="Vault v2 audit"
+            placeholder="e.g. Vault v2 audit"
             onChange={set("name")}
           />
           <Field
             id="auditor"
             label="Auditor"
             value={form.auditor}
-            placeholder='Firm name, or "Internal"'
+            placeholder="e.g. Acme Security, or Internal"
             onChange={set("auditor")}
           />
           <Inline space="space.200" shouldWrap>
@@ -409,14 +409,14 @@ const NewAudit = ({ done, cancel }: { done: (id: string) => void; cancel: () => 
               id="workspace"
               label="Bitbucket workspace"
               value={form.workspace}
-              placeholder="auditgate-demo"
+              placeholder="e.g. auditgate-demo"
               onChange={set("workspace")}
             />
             <Field
               id="repo"
               label="Repository"
               value={form.repoSlug}
-              placeholder="vault-v2"
+              placeholder="e.g. vault-v2"
               onChange={set("repoSlug")}
             />
           </Inline>
@@ -424,7 +424,7 @@ const NewAudit = ({ done, cancel }: { done: (id: string) => void; cancel: () => 
             id="commit"
             label="Audited commit"
             value={form.auditedCommit}
-            placeholder="40-character SHA"
+            placeholder="e.g. 3f1c2a9e0b7d… (all 40 characters)"
             helper="The exact commit the auditor reviewed. In the repo, run: git rev-parse HEAD"
             monospace
             onChange={set("auditedCommit")}
@@ -436,7 +436,7 @@ const NewAudit = ({ done, cancel }: { done: (id: string) => void; cancel: () => 
               value={form.scope}
               minimumRows={4}
               isMonospaced
-              placeholder={"src/TokenVault.sol\nsrc/PriceOracle.sol"}
+              placeholder="e.g. src/TokenVault.sol (one path per line)"
               onChange={(e) =>
                 set("scope")(
                   String((e as unknown as { target?: { value?: string } }).target?.value ?? ""),
@@ -448,14 +448,18 @@ const NewAudit = ({ done, cancel }: { done: (id: string) => void; cancel: () => 
               audited commit counts as drift.
             </HelperMessage>
           </Stack>
-          <Toggle
-            id="strict"
-            label="Block merges on any change to an audited file until someone re-reviews it"
-            isChecked={form.blockOnUnreviewedChanges}
-            onChange={() =>
-              setForm((f) => ({ ...f, blockOnUnreviewedChanges: !f.blockOnUnreviewedChanges }))
-            }
-          />
+          <Inline space="space.100" alignBlock="center">
+            <Toggle
+              id="strict"
+              isChecked={form.blockOnUnreviewedChanges}
+              onChange={() =>
+                setForm((f) => ({ ...f, blockOnUnreviewedChanges: !f.blockOnUnreviewedChanges }))
+              }
+            />
+            <Label labelFor="strict">
+              Block merges on any change to an audited file until someone re-reviews it
+            </Label>
+          </Inline>
         </Stack>
       </Box>
 
@@ -545,9 +549,7 @@ const CheckChange = ({ auditId, auditedCommit }: { auditId: string; auditedCommi
             minimumRows={5}
             isMonospaced
             value={text}
-            placeholder={
-              "M\tsrc/TokenVault.sol\nM\tsrc/RewardsDistributor.sol\nA\tsrc/NewFeature.sol"
-            }
+            placeholder="e.g. M  src/TokenVault.sol (one file per line)"
             onChange={(e) =>
               setText(String((e as unknown as { target?: { value?: string } }).target?.value ?? ""))
             }
@@ -565,6 +567,12 @@ const CheckChange = ({ auditId, auditedCommit }: { auditId: string; auditedCommi
           >
             Check
           </LoadingButton>
+          <Button
+            appearance="subtle"
+            onClick={() => setText("M\tsrc/RewardsDistributor.sol\nM\tREADME.md")}
+          >
+            Fill in an example
+          </Button>
         </Inline>
         {error ? <ErrorMessage>{error}</ErrorMessage> : null}
         {result ? (
@@ -719,7 +727,7 @@ const AuditPage = ({ id, back }: { id: string; back: () => void }) => {
         </Stack>
       </Inline>
 
-      <DynamicTable head={head} rows={rows} label="Findings" rowsPerPage={25} defaultSortKey="id" />
+      <DynamicTable head={head} rows={rows} label="Findings" rowsPerPage={25} />
 
       {!importing ? (
         <CheckChange auditId={summary.id} auditedCommit={summary.auditedCommit} />
