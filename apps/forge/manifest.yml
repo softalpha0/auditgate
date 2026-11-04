@@ -56,6 +56,125 @@ modules:
           type: string
           searchAlias: auditgateFile
 
+  # Rovo: an agent plus read-only actions. The same actions are exposed as MCP tools below.
+  rovo:agent:
+    - key: auditgate-agent
+      name: AuditGate
+      description: Answers whether a release is safe to ship, what changed since the audit, and who owns each audit finding.
+      icon: resource:icons;auditgate.svg
+      prompt: resource:agent-prompt;prompt.txt
+      conversationStarters:
+        - Is the latest release safe to ship?
+        - Summarize open audit findings by severity
+        - What changed since the audit?
+        - Who owns H-03?
+      actions:
+        - release-readiness
+        - list-open-findings
+        - get-finding
+        - check-drift
+
+  action:
+    - key: release-readiness
+      name: Release readiness
+      function: fn-release-readiness
+      actionVerb: GET
+      description: >-
+        Says whether a release is safe to ship according to its smart-contract audit: the release gate
+        verdict, the Critical and High findings that block it with their Jira keys, accepted risks, and
+        counts by severity and status.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: false
+          description: The Jira project key, for example VAULT. Leave empty to use the project the user is viewing.
+        audit:
+          title: Audit
+          type: string
+          required: false
+          description: The audit name or part of it, for example "v2". Leave empty for the newest audit.
+    - key: list-open-findings
+      name: List open findings
+      function: fn-list-open-findings
+      actionVerb: GET
+      description: >-
+        Lists audit findings that are not yet verified or accepted, most severe first, with Jira keys,
+        status and file, plus counts by severity. Can filter by one severity.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: false
+          description: The Jira project key, for example VAULT. Leave empty to use the project the user is viewing.
+        audit:
+          title: Audit
+          type: string
+          required: false
+          description: The audit name or part of it, for example "v2". Leave empty for the newest audit.
+        severity:
+          title: Severity
+          type: string
+          required: false
+          description: Only this severity. One of Critical, High, Medium, Low, Informational, Gas.
+    - key: get-finding
+      name: Get finding
+      function: fn-get-finding
+      actionVerb: GET
+      description: >-
+        Details of one audit finding: severity, status, owner (Jira assignee), file and code location,
+        recommendation, whether it blocks the release, and recent status history.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: false
+          description: The Jira project key, for example VAULT. Leave empty to use the project the user is viewing.
+        audit:
+          title: Audit
+          type: string
+          required: false
+          description: The audit name or part of it, for example "v2". Leave empty for the newest audit.
+        finding:
+          title: Finding
+          type: string
+          required: true
+          description: The finding's audit ID such as H-03, or its Jira issue key such as VAULT-4.
+    - key: check-drift
+      name: Check drift
+      function: fn-check-drift
+      actionVerb: GET
+      description: >-
+        Checks files changed since the audited commit against the audit scope: which audited files
+        changed, the findings they affect, and whether the merge is blocked. Without a file list,
+        returns the git command to get one.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: false
+          description: The Jira project key, for example VAULT. Leave empty to use the project the user is viewing.
+        audit:
+          title: Audit
+          type: string
+          required: false
+          description: The audit name or part of it, for example "v2". Leave empty for the newest audit.
+        changedFiles:
+          title: Changed files
+          type: string
+          required: false
+          description: Output of git diff --name-status <audited-commit> HEAD, or one file path per line.
+
+  # MCP: the same read-only actions as tools for Rovo Studio agents and third-party MCP clients.
+  rovo:mcp:
+    - key: auditgate-mcp
+      name: AuditGate
+      tools:
+        - release-readiness
+        - list-open-findings
+        - get-finding
+        - check-drift
+
   consumer:
     - key: auditgate-import-consumer
       queue: auditgate-import
@@ -69,6 +188,14 @@ modules:
     - key: import-consumer
       handler: index.importConsumer
       timeoutSeconds: 900
+    - key: fn-release-readiness
+      handler: index.releaseReadinessAction
+    - key: fn-list-open-findings
+      handler: index.listOpenFindingsAction
+    - key: fn-get-finding
+      handler: index.getFindingAction
+    - key: fn-check-drift
+      handler: index.checkDriftAction
 
 resources:
   - key: project-page
@@ -77,6 +204,8 @@ resources:
     path: src/frontend/issue-panel.tsx
   - key: icons
     path: static/icons
+  - key: agent-prompt
+    path: resources/agent
 
 permissions:
   scopes:

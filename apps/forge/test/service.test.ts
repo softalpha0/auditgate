@@ -83,7 +83,9 @@ describe("createAudit", () => {
   });
 
   it("refuses when the user can't create issues in the project", async () => {
-    const { deps } = makeDeps({ userJira: { canCreateIssues: async () => false } });
+    const { deps } = makeDeps({
+      userJira: { canCreateIssues: async () => false, visibleProject: async () => null },
+    });
     await expect(createAudit(deps, caller, input())).rejects.toThrow(/permission to create issues/);
   });
 

@@ -14,6 +14,8 @@ export interface IssueLink {
 export interface Store {
   getAudit(projectId: string, auditId: string): Promise<StoredAudit | undefined>;
   listAudits(projectId: string): Promise<StoredAudit[]>;
+  /** Every audit on the site, across projects. Callers must filter by what the user can see. */
+  listAllAudits(): Promise<StoredAudit[]>;
   putAudit(audit: StoredAudit): Promise<void>;
   listFindings(auditId: string): Promise<StoredFinding[]>;
   getFinding(auditId: string, findingId: string): Promise<StoredFinding | undefined>;
@@ -51,11 +53,17 @@ export interface Jira {
   setFindingProperty(issueKey: string, value: IssueProperty): Promise<void>;
   /** Issues already carrying this audit's property. Used to recover after a crash mid-import. */
   findAuditIssues(auditId: string): Promise<{ id: string; key: string; findingId: string }[]>;
+  /** Display name of each issue's assignee, or null when unassigned. */
+  getAssignees(issueKeys: string[]): Promise<Record<string, string | null>>;
+  /** Display names for Atlassian account IDs. Unknown IDs are left out. */
+  getUserNames(accountIds: string[]): Promise<Record<string, string>>;
 }
 
 /** The user-facing check: can this person create issues in the project? */
 export interface UserJira {
   canCreateIssues(projectId: string): Promise<boolean>;
+  /** The project as the current user sees it, or null if it doesn't exist or they can't browse it. */
+  visibleProject(projectIdOrKey: string): Promise<{ id: string; key: string; name: string } | null>;
 }
 
 export interface ImportQueue {

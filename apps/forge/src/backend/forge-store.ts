@@ -39,6 +39,7 @@ async function batchSet<T>(items: { key: string; value: T }[]): Promise<void> {
 export const forgeStore: Store = {
   getAudit: (projectId, auditId) => kvs.get<StoredAudit>(auditKey(projectId, auditId)),
   listAudits: (projectId) => listByPrefix<StoredAudit>(`audit:${projectId}:`),
+  listAllAudits: () => listByPrefix<StoredAudit>("audit:"),
   putAudit: (audit) => kvs.set(auditKey(audit.projectId, audit.id), audit),
   listFindings: (auditId) => listByPrefix<StoredFinding>(`finding:${auditId}:`),
   getFinding: (auditId, findingId) => kvs.get<StoredFinding>(findingKey(auditId, findingId)),

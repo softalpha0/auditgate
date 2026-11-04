@@ -18,6 +18,9 @@ export class MemoryStore implements Store {
   async listAudits(projectId: string) {
     return [...this.audits.values()].filter((a) => a.projectId === projectId).map(clone);
   }
+  async listAllAudits() {
+    return [...this.audits.values()].map(clone);
+  }
   async putAudit(audit: StoredAudit) {
     this.audits.set(`${audit.projectId}:${audit.id}`, clone(audit));
   }
@@ -113,6 +116,20 @@ export class FakeJira implements Jira {
     issue.property = clone(value);
   }
 
+  /** Assignee display names by issue key; unassigned when missing. */
+  assignees: Record<string, string> = {};
+  users: Record<string, string> = { "user-1": "Ada Lovelace", "user-2": "Grace Hopper" };
+
+  async getAssignees(issueKeys: string[]) {
+    return Object.fromEntries(issueKeys.map((k) => [k, this.assignees[k] ?? null]));
+  }
+
+  async getUserNames(accountIds: string[]) {
+    return Object.fromEntries(
+      accountIds.filter((id) => this.users[id]).map((id) => [id, this.users[id] as string]),
+    );
+  }
+
   async findAuditIssues(auditId: string) {
     return this.issues
       .filter((i) => i.property.auditId === auditId)
@@ -120,7 +137,16 @@ export class FakeJira implements Jira {
   }
 }
 
+/** Projects the fake user can browse. Tests delete entries to hide a project. */
+export const visibleProjects = (): Record<string, { id: string; key: string; name: string }> => ({
+  "10000": { id: "10000", key: "VAULT", name: "Vault" },
+  VAULT: { id: "10000", key: "VAULT", name: "Vault" },
+  "20000": { id: "20000", key: "BRIDGE", name: "Bridge" },
+  BRIDGE: { id: "20000", key: "BRIDGE", name: "Bridge" },
+});
+
 export function makeDeps(overrides: Partial<Deps> = {}) {
+  const projects = visibleProjects();
   const store = new MemoryStore();
   const jira = new FakeJira();
   const jobs: ImportJob[] = [];
@@ -129,11 +155,14 @@ export function makeDeps(overrides: Partial<Deps> = {}) {
   const deps: Deps = {
     store,
     jira,
-    userJira: { canCreateIssues: async () => true },
+    userJira: {
+      canCreateIssues: async () => true,
+      visibleProject: async (ref: string) => projects[ref] ?? null,
+    },
     queue: { push: async (job) => void jobs.push(job) },
     now: () => new Date(Date.UTC(2026, 10, 2, 9, 0, clock++)).toISOString(),
     newId: () => `a${String(++ids).padStart(9, "0")}`,
     ...overrides,
   };
-  return { deps, store, jira, jobs };
+  return { deps, store, jira, jobs, projects };
 }

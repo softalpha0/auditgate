@@ -173,6 +173,39 @@ export const forgeJira: Jira = {
     } while (nextPageToken);
     return found;
   },
+  async getAssignees(issueKeys) {
+    const out: Record<string, string | null> = {};
+    if (issueKeys.length === 0) return out;
+    const res = await api.asApp().requestJira(route`/rest/api/3/search/jql`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        jql: `key in (${issueKeys.map((k) => `"${k.replace(/[^A-Za-z0-9-]/g, "")}"`).join(",")})`,
+        fields: ["assignee"],
+        maxResults: issueKeys.length,
+      }),
+    });
+    await expectOk(res, "look up who owns these issues");
+    const body = (await res.json()) as {
+      issues?: { key: string; fields?: { assignee?: { displayName?: string } | null } }[];
+    };
+    for (const issue of body.issues ?? [])
+      out[issue.key] = issue.fields?.assignee?.displayName ?? null;
+    return out;
+  },
+
+  async getUserNames(accountIds) {
+    const out: Record<string, string> = {};
+    const ids = accountIds.filter((id) => /^[A-Za-z0-9:_-]+$/.test(id)).slice(0, 50);
+    if (ids.length === 0) return out;
+    const query = new URLSearchParams(ids.map((id) => ["accountId", id]));
+    const res = await api.asApp().requestJira(route`/rest/api/3/user/bulk?${query}`);
+    if (!res.ok) return out; // Names are a nicety; never fail an answer over them.
+    const body = (await res.json()) as { values?: { accountId: string; displayName?: string }[] };
+    for (const user of body.values ?? [])
+      if (user.displayName) out[user.accountId] = user.displayName;
+    return out;
+  },
 };
 
 export const forgeUserJira: UserJira = {
@@ -183,5 +216,15 @@ export const forgeUserJira: UserJira = {
     if (!res.ok) return false;
     const body = (await res.json()) as { issueTypes?: unknown[] };
     return (body.issueTypes?.length ?? 0) > 0;
+  },
+
+  async visibleProject(projectIdOrKey) {
+    if (!/^[A-Za-z0-9_-]{1,50}$/.test(projectIdOrKey)) return null;
+    const res = await api.asUser().requestJira(route`/rest/api/3/project/${projectIdOrKey}`);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { id?: string; key?: string; name?: string };
+    return body.id && body.key
+      ? { id: String(body.id), key: body.key, name: body.name ?? body.key }
+      : null;
   },
 };
