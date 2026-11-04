@@ -152,10 +152,10 @@ const AuditList = ({ open, create }: { open: (id: string) => void; create: () =>
       {
         key: a.name,
         content: (
-          <Stack space="space.025">
-            <Button appearance="subtle" spacing="none" onClick={() => open(a.id)}>
+          <Stack space="space.025" alignInline="start">
+            <LoadingButton appearance="link" spacing="none" onClick={() => open(a.id)}>
               {a.name}
-            </Button>
+            </LoadingButton>
             <Text size="small" color="color.text.subtlest">{`${a.auditor} · ${a.repo}`}</Text>
           </Stack>
         ),

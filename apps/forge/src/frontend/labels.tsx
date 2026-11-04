@@ -61,3 +61,13 @@ export function formatDate(iso: string | undefined): string {
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
+
+/** Markdown from audit reports, as plain text for components that can't render Markdown. */
+export function plainText(markdown: string): string {
+  return markdown
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}

@@ -598,7 +598,9 @@ export async function checkChange(
       `Paste at least one changed file. In the repo, run: git diff --name-status ${audit.auditedCommit.slice(0, 7)} HEAD`,
     );
   }
-  const findings = await deps.store.listFindings(audit.id);
+  const findings = (await deps.store.listFindings(audit.id)).sort(
+    (a, b) => compareSeverity(a.severity, b.severity) || a.externalId.localeCompare(b.externalId),
+  );
   const drift = computeDrift({ auditedFiles: audit.auditedFiles, findings, changes });
   const gate = evaluateGate(findings, drift, {
     blockOnUnreviewedChanges: audit.settings.blockOnUnreviewedChanges,

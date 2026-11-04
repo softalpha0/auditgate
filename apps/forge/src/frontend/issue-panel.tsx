@@ -20,7 +20,14 @@ import type { FindingStatus } from "@auditgate/core";
 import type { ChangeStatusInput, PanelView } from "../shared/contract";
 import { RESOLVERS } from "../shared/contract";
 import { call } from "./api";
-import { STATUS_LABEL, SeverityLozenge, StatusLozenge, formatDate, shortSha } from "./labels";
+import {
+  STATUS_LABEL,
+  SeverityLozenge,
+  StatusLozenge,
+  formatDate,
+  plainText,
+  shortSha,
+} from "./labels";
 
 const ACTION_LABEL: Partial<Record<FindingStatus, string>> = {
   InFix: "Start fix",
@@ -154,7 +161,7 @@ const App = () => {
       {finding.recommendation ? (
         <Stack space="space.050">
           <Text weight="semibold">Recommendation</Text>
-          <Text>{finding.recommendation}</Text>
+          <Text>{plainText(finding.recommendation)}</Text>
         </Stack>
       ) : null}
 
