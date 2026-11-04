@@ -1,0 +1,13 @@
+
+> auditgate@ test /home/user/auditgate
+> vitest run
+
+
+ RUN  v5.0.5 /home/user/auditgate
+
+
+ Test Files  2 passed (2)
+      Tests  31 passed (31)
+   Start at  06:44:29
+   Duration  173ms (import 37%, transform 31%, tests 21%, worker 11%)
+

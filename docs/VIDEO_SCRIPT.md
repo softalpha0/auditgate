@@ -1,0 +1,32 @@
+# Demo video script (draft)
+
+The rules allow up to 5 minutes but say judges don't have to watch past 3. So **the whole story fits in 2:50**: problem, solution, demo, how it works, what's next. Anything after 3:00 is a bonus for judges who keep watching.
+
+About 130 words per minute. This draft is 250 spoken words, about 1:55 of talking, which leaves 55 seconds for the screen to show things working without narration. Refine weekly; record in week 7. Everything shown must work on a fresh site.
+
+| Time      | Part           | On screen                                                                                                                                       | Voiceover                                                                                                                                                                                                                                                                                                                                             |
+| --------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0:00–0:20 | Problem        | A headline-style card: "Nomad bridge, Aug 2022, about $190M lost". Then the audit report PDF beside a code diff.                                | "In 2022, Nomad's bridge lost about 190 million dollars. It had been audited two months earlier. According to the auditor, the vulnerable code was changed after the audit began. Security researchers have a name for this: audit drift. The code that ships isn't the code that was reviewed."                                                      |
+| 0:20–0:35 | Solution       | AuditGate project page in Jira.                                                                                                                 | "AuditGate turns audit findings into Jira work, and blocks a Bitbucket merge while serious findings are open, or while audited code has changed since the audit." [If an interview quote exists, use it here instead of the second half.]                                                                                                             |
+| 0:35–1:05 | Demo: import   | Upload `vault-v2-audit.md`. Preview: 11 findings. Create. Issues appear; open C-01 and show the panel with the link to the exact lines.         | "Here's a real audit report for a token vault. One upload, and every finding is a Jira issue, with the exact lines at the commit the auditor reviewed. Re-import a newer report and the issues update. Nothing is duplicated."                                                                                                                        |
+| 1:05–1:50 | Demo: the gate | Bitbucket PR that fixes H-01 but also edits `RewardsDistributor.sol`. The AuditGate check fails with its message. Then the drift panel in Jira. | "A developer fixes the reentrancy bug. But they also touched the rewards contract, which was in scope. The merge is blocked. AuditGate names the open findings, and the audited file that changed without review." _(pause on the message)_ "This is the moment the audit stops matching the code, caught before it merges, not after it's deployed." |
+| 1:50–2:15 | Demo: Rovo     | Rovo chat: "Is v2 safe to ship?" Answer cites Jira keys and the commit. Then "What changed since the audit?"                                    | "In the release meeting, ask Rovo. The agent answers from AuditGate's data, cites every Jira key, and says which commit it checked."                                                                                                                                                                                                                  |
+| 2:15–2:35 | How it works   | A simple diagram: Jira app, Bitbucket app, Forge storage, Rovo agent, MCP tools.                                                                | "AuditGate is two Forge apps, one for Jira and one for Bitbucket, because Forge can't span both in one app. Data stays in Forge storage and Jira. The same actions are exposed as MCP tools, so other agents can use them too."                                                                                                                       |
+| 2:35–2:50 | What's next    | Sign-off button pressed; gate shows clear. End card with name and tagline.                                                                      | "Next, we'll compare deployed bytecode with the audited commit. Because an audit only protects you if it's the code you ship."                                                                                                                                                                                                                        |
+
+## Recording notes
+
+- Seed the demo site the day before. Re-run the import so issue numbers start at 1.
+- Browser at 125% zoom, bookmarks bar off, notifications off.
+- Record the screen first, then the voiceover. Add captions.
+- Music: none, or royalty-free only. No third-party logos except Atlassian's own products shown in use.
+- If the live demo misbehaves while recording, cut to the backup recording of that step. Never show something that doesn't work.
+
+## Hard questions to rehearse
+
+1. How is this different from Zellic's Audit Coverage Tracker? (Before merge versus after deployment; your repo versus public protocols.)
+2. What if a developer edits the issue property to fake a status? (AuditGate never trusts it; the Bitbucket side checks a signature.)
+3. File-level drift gives false positives for a comment change. Why not line-level? (Line numbers move with every edit; file-level is the honest strict default, and a re-review clears it in one click.)
+4. Does it block merges on free Bitbucket? (No. It shows a failing check; blocking needs Premium. Said plainly in the docs.)
+5. What did you build during the event? (Everything; first commit 29 Oct 2026.)
+6. Did you talk to real users? (Answer from `USER_INTERVIEWS.md`.)

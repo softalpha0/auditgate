@@ -1,0 +1,5 @@
+Forge CLI 15.0.0, app apps/forge
+Manifest: valid
+Backend bundle: ok (index.cjs 256 KB)
+UI bundle project-page: ok (238 KB)
+UI bundle issue-panel: ok (229 KB)

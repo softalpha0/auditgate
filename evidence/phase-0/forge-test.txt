@@ -1,0 +1,13 @@
+Compiling 1 files with Solc 0.8.24
+Solc 0.8.24 finished in 236.13ms
+Compiler run successful!
+
+Ran 5 tests for test/Exploits.t.sol:ExploitsTest
+[PASS] test_C01_anyoneCanSetPrice() (gas: 132710)
+[PASS] test_H01_reentrancyDrainsVault() (gas: 252669)
+[PASS] test_H02_anyoneCanRedirectFees() (gas: 129332)
+[PASS] test_L01_smallWithdrawalsPayNoFee() (gas: 124652)
+[PASS] test_M01_failedTransferStillCredits() (gas: 39681)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.27ms (1.14ms CPU time)
+
+Ran 1 test suite in 3.66ms (1.27ms CPU time): 5 tests passed, 0 failed, 0 skipped (5 total tests)

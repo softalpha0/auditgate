@@ -1,0 +1,12 @@
+
+ RUN  v5.0.5 /home/user/auditgate
+
+
+ Test Files  15 passed (15)
+      Tests  154 passed (154)
+   Start at  00:52:56
+   Duration  984ms (import 38%, tests 34%, transform 19%, worker 8%)
+
+    Isolate  15 workers spawned · ~111ms startup each (spawn + environment, per file)
+             at least ~443ms faster with isolate: false — reuses workers across files instead of one per file
+

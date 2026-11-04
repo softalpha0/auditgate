@@ -1,0 +1,90 @@
+'forge clean' running (wd: /home/user/auditgate/demo/contracts)
+'forge config --json' running
+'forge build --build-info --deny never --skip ./test/** ./script/** --force' running (wd: /home/user/auditgate/demo/contracts)
+INFO:Detectors:
+Detector: arbitrary-send-eth
+TokenVault.emergencyWithdraw(address) (src/TokenVault.sol#69-72) sends eth to arbitrary user
+	Dangerous calls:
+	- to.transfer(address(this).balance) (src/TokenVault.sol#71)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#functions-that-send-ether-to-arbitrary-destinations
+INFO:Detectors:
+Detector: reentrancy-eth
+Reentrancy in TokenVault.withdrawEth() (src/TokenVault.sol#36-43):
+	External calls:
+	- (ok,None) = msg.sender.call{value: amount}() (src/TokenVault.sol#39)
+	State variables written after the call(s):
+	- ethBalance[msg.sender] = 0 (src/TokenVault.sol#41)
+	TokenVault.ethBalance (src/TokenVault.sol#17) can be used in cross function reentrancies:
+	- TokenVault.depositEth() (src/TokenVault.sol#30-33)
+	- TokenVault.ethBalance (src/TokenVault.sol#17)
+	- TokenVault.withdrawEth() (src/TokenVault.sol#36-43)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+INFO:Detectors:
+Detector: unchecked-transfer
+RewardsDistributor.distribute(uint256) (src/RewardsDistributor.sol#31-40) ignores return value by rewardToken.transfer(s,share) (src/RewardsDistributor.sol#38)
+TokenVault.depositToken(uint256) (src/TokenVault.sol#45-49) ignores return value by token.transferFrom(msg.sender,address(this),amount) (src/TokenVault.sol#47)
+TokenVault.withdrawToken(uint256) (src/TokenVault.sol#51-60) ignores return value by token.transfer(feeRecipient,fee) (src/TokenVault.sol#58)
+TokenVault.withdrawToken(uint256) (src/TokenVault.sol#51-60) ignores return value by token.transfer(msg.sender,amount - fee) (src/TokenVault.sol#59)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unchecked-transfer
+INFO:Detectors:
+Detector: divide-before-multiply
+RewardsDistributor.distribute(uint256) (src/RewardsDistributor.sol#31-40) performs a multiplication on the result of a division:
+	- share = (pot / totalStake) * stakeOf[s] (src/RewardsDistributor.sol#36)
+TokenVault.withdrawToken(uint256) (src/TokenVault.sol#51-60) performs a multiplication on the result of a division:
+	- fee = (amount / 10_000) * feeBps (src/TokenVault.sol#56)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply
+INFO:Detectors:
+Detector: tx-origin
+TokenVault.emergencyWithdraw(address) (src/TokenVault.sol#69-72) uses tx.origin for authorization: require(bool,string)(tx.origin == owner,not owner) (src/TokenVault.sol#70)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-usage-of-txorigin
+INFO:Detectors:
+Detector: missing-zero-check
+TokenVault.constructor(IERC20,PriceOracle,address)._feeRecipient (src/TokenVault.sol#23) lacks a zero-check on :
+		- feeRecipient = _feeRecipient (src/TokenVault.sol#27)
+TokenVault.setFeeRecipient(address).newRecipient (src/TokenVault.sol#63) lacks a zero-check on :
+		- feeRecipient = newRecipient (src/TokenVault.sol#65)
+TokenVault.emergencyWithdraw(address).to (src/TokenVault.sol#69) lacks a zero-check on :
+		- to.transfer(address(this).balance) (src/TokenVault.sol#71)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation
+INFO:Detectors:
+Detector: calls-loop
+RewardsDistributor.distribute(uint256) (src/RewardsDistributor.sol#31-40) has external calls inside a loop: rewardToken.transfer(s,share) (src/RewardsDistributor.sol#38)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
+INFO:Detectors:
+Detector: reentrancy-benign
+Reentrancy in TokenVault.depositToken(uint256) (src/TokenVault.sol#45-49):
+	External calls:
+	- token.transferFrom(msg.sender,address(this),amount) (src/TokenVault.sol#47)
+	State variables written after the call(s):
+	- tokenBalance[msg.sender] += amount (src/TokenVault.sol#48)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+INFO:Detectors:
+Detector: reentrancy-events
+Reentrancy in TokenVault.withdrawEth() (src/TokenVault.sol#36-43):
+	External calls:
+	- (ok,None) = msg.sender.call{value: amount}() (src/TokenVault.sol#39)
+	Event emitted after the call(s):
+	- Withdrawn(msg.sender,amount) (src/TokenVault.sol#42)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-4
+INFO:Detectors:
+Detector: timestamp
+PriceOracle.isFresh() (src/PriceOracle.sol#28-30) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp - updatedAt < 3600 (src/PriceOracle.sol#29)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: low-level-calls
+Low level call in TokenVault.withdrawEth() (src/TokenVault.sol#36-43):
+	- (ok,None) = msg.sender.call{value: amount}() (src/TokenVault.sol#39)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+INFO:Detectors:
+Detector: constable-states
+TokenVault.feeBps (src/TokenVault.sol#15) should be constant 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variables-that-could-be-declared-constant
+INFO:Detectors:
+Detector: immutable-states
+PriceOracle.owner (src/PriceOracle.sol#8) should be immutable 
+RewardsDistributor.owner (src/RewardsDistributor.sol#11) should be immutable 
+TokenVault.owner (src/TokenVault.sol#13) should be immutable 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variables-that-could-be-declared-immutable
+INFO:Slither:. analyzed (4 contracts with 102 detectors), 21 result(s) found

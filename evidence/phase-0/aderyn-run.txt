@@ -1,0 +1,28 @@
+
+------------------------------------------------
+# Configuration
+------------------------------------------------
+Root - /home/user/auditgate/demo/contracts
+Source - /home/user/auditgate/demo/contracts/src
+Remappings - []
+EVM version - cancun
+------------------------------------------------
+# Source Scope
+------------------------------------------------
+Include Filepaths Containing - No specific criteria.
+Exclude Filepaths Containing - No specific criteria.
+Auto Excluding - No Files.
+------------------------------------------------
+# Compiling Abstract Syntax Trees
+------------------------------------------------
+Ingesting 4 compiled files [solc : v0.8.24]
+------------------------------------------------
+# Scanning Contracts
+------------------------------------------------
+Running 88 detectors
+Detectors run, printing report.
+Report printed to /tmp/claude-0/-home-user/92f08d65-9c80-5ad4-b615-751bfdf39a61/scratchpad/ad2.json
+
+🛡️ Together we make Solidity safer.
+✨ Support open-source security — star Aderyn:
+https://github.com/Cyfrin/aderyn

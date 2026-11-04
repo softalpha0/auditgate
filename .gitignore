@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+.next/
+out/
+.vercel/
+*.log
+.DS_Store
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# Forge
+apps/forge/static/*/build/
+
+# Foundry
+demo/contracts/out/
+demo/contracts/cache/
+demo/contracts/broadcast/

@@ -1,0 +1,86 @@
+# AuditGate for Jira.
+# `forge register` replaces the placeholder app id below with your own. See docs/SETUP.md.
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs24.x
+    memoryMB: 512
+
+modules:
+  jira:projectPage:
+    - key: auditgate-project-page
+      title: AuditGate
+      icon: resource:icons;auditgate.svg
+      resource: project-page
+      render: native
+      resolver:
+        function: project-page-resolver
+
+  jira:issuePanel:
+    - key: auditgate-issue-panel
+      title: AuditGate finding
+      icon: resource:icons;auditgate.svg
+      resource: issue-panel
+      render: native
+      resolver:
+        function: issue-panel-resolver
+      # Only on issues AuditGate created. The property is a display hint; storage stays the source of truth.
+      displayConditions:
+        entityPropertyExists:
+          entity: issue
+          propertyKey: auditgate
+
+  # Makes the finding data on each issue searchable, for example:
+  #   auditgateStatus = "Drifted" AND auditgateRank <= 1
+  jira:entityProperty:
+    - key: auditgate-finding-property
+      entityType: issue
+      propertyKey: auditgate
+      values:
+        - path: auditId
+          type: string
+          searchAlias: auditgateAudit
+        - path: externalId
+          type: string
+          searchAlias: auditgateFinding
+        - path: severity
+          type: string
+          searchAlias: auditgateSeverity
+        - path: severityRank
+          type: number
+          searchAlias: auditgateRank
+        - path: status
+          type: string
+          searchAlias: auditgateStatus
+        - path: file
+          type: string
+          searchAlias: auditgateFile
+
+  consumer:
+    - key: auditgate-import-consumer
+      queue: auditgate-import
+      function: import-consumer
+
+  function:
+    - key: project-page-resolver
+      handler: index.projectPageHandler
+    - key: issue-panel-resolver
+      handler: index.issuePanelHandler
+    - key: import-consumer
+      handler: index.importConsumer
+      timeoutSeconds: 900
+
+resources:
+  - key: project-page
+    path: src/frontend/project-page.tsx
+  - key: issue-panel
+    path: src/frontend/issue-panel.tsx
+  - key: icons
+    path: static/icons
+
+permissions:
+  scopes:
+    - read:jira-work # project, create metadata, JQL search
+    - write:jira-work # create and update finding issues, issue properties
+    - read:jira-user # user names in the panel history and the approver picker
+    - storage:app # audits and findings in Forge KVS
