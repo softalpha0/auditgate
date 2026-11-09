@@ -50,6 +50,12 @@ export interface Jira {
   /** Up to 50 issues per call. */
   createIssues(bodies: IssueBody[]): Promise<{ created: CreatedIssue[]; failed: FailedIssue[] }>;
   updateIssue(issueKey: string, fields: IssueFields): Promise<void>;
+  /**
+   * Priorities that can be set on this issue by editing it, or undefined when priority isn't
+   * editable. Team-managed projects often hide Priority on the create screen but allow it here.
+   */
+  editPriorities(issueKey: string): Promise<{ id: string; name: string }[] | undefined>;
+  setPriority(issueKey: string, priorityId: string): Promise<void>;
   setFindingProperty(issueKey: string, value: IssueProperty): Promise<void>;
   /** Issues already carrying this audit's property. Used to recover after a crash mid-import. */
   findAuditIssues(auditId: string): Promise<{ id: string; key: string; findingId: string }[]>;

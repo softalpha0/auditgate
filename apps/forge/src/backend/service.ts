@@ -16,6 +16,7 @@ import {
   locationLabel,
   mergeImport,
   needsSync,
+  pickPriorityId,
   updateIssueFields,
   type CreateContext,
   type StoredFinding,
@@ -285,6 +286,17 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
     const findings = await deps.store.listFindings(audit.id);
     const byId = new Map(findings.map((f) => [f.id, f]));
 
+    // Team-managed projects often leave Priority off the create screen but allow it on edit.
+    // Then the priority is set right after each issue is created. Looked up once per run.
+    let editPriorities: { id: string; name: string }[] | undefined | null = null;
+    const prioritiesForEdit = async (issueKey: string) => {
+      if (ctx.priorities) return ctx.priorities;
+      if (editPriorities === null) {
+        editPriorities = await deps.jira.editPriorities(issueKey).catch(() => undefined);
+      }
+      return editPriorities;
+    };
+
     // Recover keys of issues created by an earlier run that didn't get to save them.
     if (findings.some((f) => !f.jiraKey)) {
       const links: IssueLink[] = [];
@@ -371,6 +383,25 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
       await deps.store.putFindings(saved);
       await deps.store.putIssueLinks(links);
       status.created += saved.length;
+
+      if (!ctx.priorities && saved[0]?.jiraKey) {
+        const allowed = await prioritiesForEdit(saved[0].jiraKey);
+        let missed = 0;
+        if (allowed) {
+          await mapLimit(saved, UPDATE_CONCURRENCY, async (finding) => {
+            const priorityId = pickPriorityId(finding.severity, allowed);
+            if (!priorityId) return;
+            await deps.jira
+              .setPriority(finding.jiraKey as string, priorityId)
+              .catch(() => void missed++);
+          });
+        }
+        if (missed) {
+          status.messages.push(
+            `Priority couldn't be set on ${missed} issue${missed === 1 ? "" : "s"}. The severity is still in the labels and the AuditGate panel.`,
+          );
+        }
+      }
       for (const failed of result.failed) {
         status.failed++;
         status.messages.push(
@@ -380,11 +411,16 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
       await save();
     }
 
+    const editCtx: CreateContext = { ...ctx };
+    if (toUpdate[0]?.jiraKey && !ctx.priorities) {
+      const allowed = await prioritiesForEdit(toUpdate[0].jiraKey);
+      if (allowed) editCtx.priorities = allowed;
+    }
     await mapLimit(toUpdate, UPDATE_CONCURRENCY, async (finding) => {
       try {
         await deps.jira.updateIssue(
           finding.jiraKey as string,
-          updateIssueFields(finding, audit, ctx),
+          updateIssueFields(finding, audit, editCtx),
         );
         await deps.jira.setFindingProperty(
           finding.jiraKey as string,

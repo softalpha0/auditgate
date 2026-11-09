@@ -134,6 +134,29 @@ export const forgeJira: Jira = {
     await expectOk(res, `update ${issueKey}`);
   },
 
+  async editPriorities(issueKey) {
+    const res = await api.asApp().requestJira(route`/rest/api/3/issue/${issueKey}/editmeta`, {
+      headers: { Accept: "application/json" },
+    });
+    await expectOk(res, `read the editable fields of ${issueKey}`);
+    const body = (await res.json()) as {
+      fields?: { priority?: { allowedValues?: { id: string; name?: string }[] } };
+    };
+    const allowed = body.fields?.priority?.allowedValues ?? [];
+    return allowed.length ? allowed.map((v) => ({ id: v.id, name: v.name ?? "" })) : undefined;
+  },
+
+  async setPriority(issueKey, priorityId) {
+    const res = await api
+      .asApp()
+      .requestJira(route`/rest/api/3/issue/${issueKey}?notifyUsers=false`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: { priority: { id: priorityId } } }),
+      });
+    await expectOk(res, `set the priority of ${issueKey}`);
+  },
+
   async setFindingProperty(issueKey, value: IssueProperty) {
     const res = await api
       .asApp()

@@ -110,6 +110,24 @@ export class FakeJira implements Jira {
     this.updates.push(issueKey);
   }
 
+  /** Priorities allowed on edit; undefined when priority can't be edited either. */
+  editablePriorities: { id: string; name: string }[] | undefined = this.context.priorities;
+  /** Reject setPriority, like a project that blocks the edit. */
+  rejectPriorityEdit = false;
+  priorityEdits: string[] = [];
+
+  async editPriorities() {
+    return this.editablePriorities && clone(this.editablePriorities);
+  }
+
+  async setPriority(issueKey: string, priorityId: string) {
+    if (this.rejectPriorityEdit) throw new Error("priority can't be edited");
+    const issue = this.issues.find((i) => i.key === issueKey);
+    if (!issue) throw new Error(`no issue ${issueKey}`);
+    issue.fields = { ...issue.fields, priority: { id: priorityId } };
+    this.priorityEdits.push(issueKey);
+  }
+
   async setFindingProperty(issueKey: string, value: IssueProperty) {
     const issue = this.issues.find((i) => i.key === issueKey);
     if (!issue) throw new Error(`no issue ${issueKey}`);

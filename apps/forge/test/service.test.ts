@@ -162,6 +162,7 @@ describe("runImport", () => {
   it("retries without labels and priority when the create screen doesn't have them", async () => {
     const { deps, jira, jobs, store } = makeDeps();
     jira.rejectLabels = true;
+    jira.editablePriorities = undefined;
     const { id } = await createAudit(deps, caller, input());
     await runImport(deps, jobs.shift()!);
     expect(jira.issues).toHaveLength(11);
@@ -169,6 +170,45 @@ describe("runImport", () => {
     const audit = await store.getAudit("10000", id);
     expect(audit?.import.state).toBe("done");
     expect(audit?.import.messages[0]).toMatch(/without labels or priority/);
+  });
+
+  it("sets priority after creating when the create screen has no Priority field", async () => {
+    // Seen on a real team-managed project: Priority is missing on create but editable.
+    const { deps, jira, jobs, store } = makeDeps();
+    delete jira.context.priorities;
+    const { id } = await createAudit(deps, caller, input());
+    await runImport(deps, jobs.shift()!);
+
+    const priorityOf = (externalId: string) =>
+      jira.issues.find((i) => i.property.externalId === externalId)?.fields.priority?.id;
+    expect(priorityOf("C-01")).toBe("1"); // Highest
+    expect(priorityOf("H-01")).toBe("2"); // High
+    expect(priorityOf("M-01")).toBe("3"); // Medium
+    expect(priorityOf("L-01")).toBe("4"); // Low
+    expect(priorityOf("G-01")).toBe("5"); // Lowest
+    expect(jira.priorityEdits).toHaveLength(11);
+    const audit = await store.getAudit("10000", id);
+    expect(audit?.import).toMatchObject({ state: "done", created: 11, failed: 0 });
+  });
+
+  it("still finishes the import when priority can't be set after creating", async () => {
+    const { deps, jira, jobs, store } = makeDeps();
+    delete jira.context.priorities;
+    jira.rejectPriorityEdit = true;
+    const { id } = await createAudit(deps, caller, input());
+    await runImport(deps, jobs.shift()!);
+
+    expect(jira.issues).toHaveLength(11);
+    const audit = await store.getAudit("10000", id);
+    expect(audit?.import.state).toBe("done");
+    expect(audit?.import.messages).toContain(
+      "Priority couldn't be set on 11 issues. The severity is still in the labels and the AuditGate panel.",
+    );
+  });
+
+  it("doesn't touch priority after creating when the create screen already set it", async () => {
+    const { jira } = await importedAudit();
+    expect(jira.priorityEdits).toEqual([]);
   });
 
   it("splits large reports into batches of 50", async () => {
