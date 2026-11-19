@@ -2,7 +2,7 @@
 # This is a separate Forge app from the Jira one, because one Forge app can't run in both.
 # `forge register` replaces the placeholder app id below with your own. See docs/BITBUCKET.md.
 app:
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  id: ari:cloud:ecosystem::app/8c28da68-7ae4-4c36-ac6f-1499fee85676
   runtime:
     name: nodejs24.x
     memoryMB: 256
@@ -12,7 +12,9 @@ modules:
     - key: auditgate-merge-check
       function: merge-check
       name: AuditGate
-      description: Blocks the merge while a Critical or High audit finding is open in Jira, or while the pull request changes audited code without a re-review.
+      description: Blocks the merge while a Critical or High audit finding is open in
+        Jira, or while the pull request changes audited code without a
+        re-review.
       triggers:
         - on-code-pushed
         - on-merge
