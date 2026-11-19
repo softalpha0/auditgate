@@ -55,6 +55,9 @@ modules:
         - path: file
           type: string
           searchAlias: auditgateFile
+        - path: repo
+          type: string
+          searchAlias: auditgateRepo
 
   # Rovo: an agent plus read-only actions. The same actions are exposed as MCP tools below.
   rovo:agent:

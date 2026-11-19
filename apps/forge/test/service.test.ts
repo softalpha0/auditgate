@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { verifyProperty } from "@auditgate/jira";
 import { describe, expect, it } from "vitest";
 import type { CreateAuditInput } from "../src/shared/contract";
 import {
@@ -10,11 +11,13 @@ import {
   listAudits,
   manualTransitions,
   previewReport,
+  bitbucketSetup,
   reimport,
   runImport,
+  signIssues,
   type Caller,
 } from "../src/backend/service";
-import { makeDeps } from "./fakes";
+import { makeDeps, TEST_SECRET } from "./fakes";
 
 const report = (name: string) =>
   readFileSync(new URL(`../../../demo/reports/${name}`, import.meta.url), "utf8");
@@ -84,7 +87,11 @@ describe("createAudit", () => {
 
   it("refuses when the user can't create issues in the project", async () => {
     const { deps } = makeDeps({
-      userJira: { canCreateIssues: async () => false, visibleProject: async () => null },
+      userJira: {
+        canCreateIssues: async () => false,
+        canAdministerProject: async () => false,
+        visibleProject: async () => null,
+      },
     });
     await expect(createAudit(deps, caller, input())).rejects.toThrow(/permission to create issues/);
   });
@@ -403,5 +410,54 @@ describe("checkChange (what the merge check would say, without Bitbucket)", () =
     await expect(
       checkChange(deps, "10000", { auditId, changedFiles: "  \n# nothing\n" }),
     ).rejects.toThrow(/git diff --name-status 3f1c2a9 HEAD/);
+  });
+});
+
+describe("signed data for the Bitbucket merge check", () => {
+  it("signs the AuditGate data on every created issue, with the audit's repo and commit", async () => {
+    const { jira } = await importedAudit();
+    const c01 = jira.issues.find((i) => i.property.externalId === "C-01")!;
+    expect(verifyProperty(c01.property, TEST_SECRET)).toBe(true);
+    expect(c01.property).toMatchObject({
+      repo: "auditgate-demo/vault-v2",
+      files: ["src/PriceOracle.sol"],
+      audit: { auditedCommit: SHA, blockOnUnreviewedChanges: true },
+    });
+  });
+
+  it("re-signs after a status change", async () => {
+    const { deps, jira } = await importedAudit();
+    const h01 = jira.issues.find((i) => i.property.externalId === "H-01")!;
+    await changeStatus(deps, h01.id, "user-2", { to: "InFix", note: "PR #3" });
+    expect(h01.property.status).toBe("InFix");
+    expect(verifyProperty(h01.property, TEST_SECRET)).toBe(true);
+  });
+
+  it("signs issues created before signing existed", async () => {
+    const { deps, jira, jobs, store, auditId } = await importedAudit();
+    for (const issue of jira.issues) delete issue.property.sig; // as on a site from version 2.3
+    await signIssues(deps, caller, { auditId });
+    await runImport(deps, jobs.shift()!);
+    expect(jira.issues.every((i) => verifyProperty(i.property, TEST_SECRET))).toBe(true);
+    expect(jira.bulkCalls).toBe(1); // nothing was created again
+    const audit = await store.getAudit("10000", auditId);
+    expect(audit?.import.messages).toContain("Signed 11 issues for the Bitbucket merge check.");
+  });
+
+  it("shows the setup values only to project admins", async () => {
+    const { deps, admin } = await importedAudit();
+    const setup = await bitbucketSetup(deps, caller, {
+      cloudId: "9b0cbf4e-290f-4451-a764-48f8ce6d207f",
+      siteUrl: "https://softalpha-dev.atlassian.net",
+    });
+    expect(setup).toMatchObject({
+      cloudId: "9b0cbf4e-290f-4451-a764-48f8ce6d207f",
+      signingSecret: TEST_SECRET,
+      repos: [{ repo: "auditgate-demo/vault-v2", audits: [{ name: "Vault v2 audit" }] }],
+    });
+    admin.value = false;
+    await expect(bitbucketSetup(deps, caller, { cloudId: "x" })).rejects.toThrow(
+      /Only a project admin/,
+    );
   });
 });

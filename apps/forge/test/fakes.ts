@@ -155,6 +155,8 @@ export class FakeJira implements Jira {
   }
 }
 
+export const TEST_SECRET = "test-signing-secret";
+
 /** Projects the fake user can browse. Tests delete entries to hide a project. */
 export const visibleProjects = (): Record<string, { id: string; key: string; name: string }> => ({
   "10000": { id: "10000", key: "VAULT", name: "Vault" },
@@ -168,6 +170,8 @@ export function makeDeps(overrides: Partial<Deps> = {}) {
   const store = new MemoryStore();
   const jira = new FakeJira();
   const jobs: ImportJob[] = [];
+  /** Tests flip this to act as a user without Administer Projects. */
+  const admin = { value: true };
   let clock = 0;
   let ids = 0;
   const deps: Deps = {
@@ -175,12 +179,14 @@ export function makeDeps(overrides: Partial<Deps> = {}) {
     jira,
     userJira: {
       canCreateIssues: async () => true,
+      canAdministerProject: async () => admin.value,
       visibleProject: async (ref: string) => projects[ref] ?? null,
     },
     queue: { push: async (job) => void jobs.push(job) },
+    secrets: { signingSecret: async () => TEST_SECRET },
     now: () => new Date(Date.UTC(2026, 10, 2, 9, 0, clock++)).toISOString(),
     newId: () => `a${String(++ids).padStart(9, "0")}`,
     ...overrides,
   };
-  return { deps, store, jira, jobs, projects };
+  return { deps, store, jira, jobs, projects, admin };
 }

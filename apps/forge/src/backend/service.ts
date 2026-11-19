@@ -30,6 +30,7 @@ import {
 } from "@auditgate/parsers";
 import type {
   AuditDetail,
+  BitbucketSetup,
   AuditSummary,
   ChangeStatusInput,
   CheckChangeInput,
@@ -49,6 +50,7 @@ import {
   UserError,
   type ImportJob,
   type ImportQueue,
+  type Secrets,
   type IssueBody,
   type IssueLink,
   type Jira,
@@ -63,6 +65,7 @@ export interface Deps {
   jira: Jira;
   userJira: UserJira;
   queue: ImportQueue;
+  secrets: Secrets;
   now: () => string;
   newId: () => string;
 }
@@ -283,6 +286,7 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
 
   try {
     let ctx: CreateContext = await deps.jira.createContext(audit.projectId);
+    const secret = await deps.secrets.signingSecret();
     const findings = await deps.store.listFindings(audit.id);
     const byId = new Map(findings.map((f) => [f.id, f]));
 
@@ -333,7 +337,7 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
 
     for (const batch of chunk(toCreate, BULK_LIMIT)) {
       let result = await deps.jira.createIssues(
-        batch.map((f) => createIssueBody(f, audit, ctx) as IssueBody),
+        batch.map((f) => createIssueBody(f, audit, ctx, secret) as IssueBody),
       );
 
       // Some projects keep labels or priority off the create screen. Retry those without them.
@@ -346,7 +350,7 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
         };
         const retry = await deps.jira.createIssues(
           retryIdx.map(
-            (i) => createIssueBody(batch[i] as StoredFinding, audit, plain) as IssueBody,
+            (i) => createIssueBody(batch[i] as StoredFinding, audit, plain, secret) as IssueBody,
           ),
         );
         if (retry.created.length) {
@@ -424,7 +428,7 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
         );
         await deps.jira.setFindingProperty(
           finding.jiraKey as string,
-          createIssueBody(finding, audit, ctx).properties[0]!.value,
+          createIssueBody(finding, audit, ctx, secret).properties[0]!.value,
         );
         finding.syncedHash = contentHash(finding);
         await deps.store.putFindings([finding]);
@@ -437,10 +441,32 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
       }
     });
 
+    // Re-sign the AuditGate data on every other issue, so the Bitbucket merge check can trust
+    // it. Covers issues created before signing existed and a project's first Connect Bitbucket.
+    const touched = new Set([...toCreate, ...toUpdate].map((f) => f.id));
+    const toSign = findings.filter((f) => f.jiraKey && !touched.has(f.id));
+    let signed = 0;
+    await mapLimit(toSign, UPDATE_CONCURRENCY, async (finding) => {
+      try {
+        await deps.jira.setFindingProperty(
+          finding.jiraKey as string,
+          createIssueBody(finding, audit, ctx, secret).properties[0]!.value,
+        );
+        signed++;
+      } catch (error) {
+        status.failed++;
+        status.messages.push(
+          `${finding.externalId} (${finding.jiraKey}) wasn't signed for Bitbucket: ${(error as Error).message}`,
+        );
+      }
+    });
+
     status.state = status.failed ? "failed" : "done";
     if (!status.failed) {
       status.messages.push(
-        `Created ${status.created} and updated ${status.updated} issue${status.created + status.updated === 1 ? "" : "s"}.`,
+        status.created + status.updated === 0 && signed > 0
+          ? `Signed ${signed} issue${signed === 1 ? "" : "s"} for the Bitbucket merge check.`
+          : `Created ${status.created} and updated ${status.updated} issue${status.created + status.updated === 1 ? "" : "s"}.`,
       );
     }
   } catch (error) {
@@ -491,6 +517,63 @@ export function summarize(audit: StoredAudit, findings: StoredFinding[]): AuditS
     gate: { pass: gate.pass, message: gate.message },
     import: audit.import,
   };
+}
+
+async function requireProjectAdmin(deps: Deps, projectId: string): Promise<void> {
+  if (!(await deps.userJira.canAdministerProject(projectId))) {
+    throw new UserError(
+      "Only a project admin can connect Bitbucket, because the setup shows the signing secret.",
+    );
+  }
+}
+
+/** Values for the Bitbucket app's settings page. Project admins only. */
+export async function bitbucketSetup(
+  deps: Deps,
+  caller: Caller,
+  site: { cloudId?: string; siteUrl?: string },
+): Promise<BitbucketSetup> {
+  await requireProjectAdmin(deps, caller.projectId);
+  if (!site.cloudId) throw new UserError("Jira didn't say which site this is. Reload the page.");
+  const audits = (await deps.store.listAudits(caller.projectId)).sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
+  const repos = new Map<string, { id: string; name: string }[]>();
+  for (const audit of audits) {
+    const repo = `${audit.repo.workspace}/${audit.repo.slug}`;
+    repos.set(repo, [...(repos.get(repo) ?? []), { id: audit.id, name: audit.name }]);
+  }
+  return {
+    cloudId: site.cloudId,
+    siteUrl: site.siteUrl ?? "",
+    signingSecret: await deps.secrets.signingSecret(),
+    repos: [...repos].map(([repo, list]) => ({ repo, audits: list })),
+  };
+}
+
+/**
+ * Writes signed AuditGate data onto every issue of an audit, by running the import job with
+ * nothing new to import. Needed once for issues created before signing existed.
+ */
+export async function signIssues(
+  deps: Deps,
+  caller: Caller,
+  input: { auditId: string },
+): Promise<AuditSummary> {
+  await requireProjectAdmin(deps, caller.projectId);
+  const audit = await deps.store.getAudit(caller.projectId, input.auditId);
+  if (!audit) throw new UserError("That audit doesn't exist in this project any more.");
+  if (audit.import.state === "queued" || audit.import.state === "running") {
+    throw new UserError("An import for this audit is still running. Try again when it finishes.");
+  }
+  const findings = await deps.store.listFindings(audit.id);
+  const updated: StoredAudit = {
+    ...audit,
+    import: emptyImport(deps.now(), findings.filter((f) => f.jiraKey).length),
+  };
+  await deps.store.putAudit(updated);
+  await deps.queue.push({ projectId: caller.projectId, auditId: audit.id });
+  return summarize(updated, findings);
 }
 
 export async function listAudits(deps: Deps, projectId: string): Promise<AuditSummary[]> {
@@ -611,7 +694,7 @@ export async function changeStatus(
     const ctx: CreateContext = { projectId: audit.projectId, issueTypeId: "", labels: false };
     await deps.jira.setFindingProperty(
       next.jiraKey,
-      createIssueBody(next, audit, ctx).properties[0]!.value,
+      createIssueBody(next, audit, ctx, await deps.secrets.signingSecret()).properties[0]!.value,
     );
   }
   return panelView(audit, next);

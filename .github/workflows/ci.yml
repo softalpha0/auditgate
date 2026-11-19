@@ -40,6 +40,8 @@ jobs:
       - run: npm install -g @forge/cli@15.0.0
       - name: Validate the manifest and bundle with the Forge CLI's own tooling (no login needed)
         run: node scripts/forge-check.cjs apps/forge
+      - name: Same for the Bitbucket app
+        run: node scripts/forge-check.cjs apps/bitbucket
 
   contracts:
     name: Demo contracts (Foundry)

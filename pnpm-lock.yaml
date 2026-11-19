@@ -33,6 +33,49 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(yaml@2.9.1))
 
+  apps/bitbucket:
+    dependencies:
+      '@auditgate/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@auditgate/drift':
+        specifier: workspace:*
+        version: link:../../packages/drift
+      '@auditgate/gate':
+        specifier: workspace:*
+        version: link:../../packages/gate
+      '@auditgate/jira':
+        specifier: workspace:*
+        version: link:../../packages/jira
+      '@forge/api':
+        specifier: 8.4.0
+        version: 8.4.0(typescript@6.0.3)
+      '@forge/bridge':
+        specifier: 7.2.1
+        version: 7.2.1(@types/react@18.3.31)(react@18.3.1)(typescript@6.0.3)
+      '@forge/kvs':
+        specifier: 2.1.1
+        version: 2.1.1(typescript@6.0.3)
+      '@forge/react':
+        specifier: 12.4.0
+        version: 12.4.0(eslint@10.13.0)(prop-types@15.8.1)(react-dom@18.3.1(react@18.3.1))(typescript@6.0.3)
+      '@forge/resolver':
+        specifier: 2.0.2
+        version: 2.0.2(typescript@6.0.3)
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@auditgate/parsers':
+        specifier: workspace:*
+        version: link:../../packages/parsers
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
+      '@types/react':
+        specifier: 18.3.31
+        version: 18.3.31
+
   apps/forge:
     dependencies:
       '@auditgate/core':

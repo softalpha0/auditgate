@@ -4,14 +4,14 @@ Everything here was checked against the Forge docs and the Forge MCP server (29â
 
 ## 0. Decisions so far
 
-| Decision                                                | Choice                                                                                        | Status                                                                              |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| How the Jira and Bitbucket apps share state (section 2) | Option A: Jira app is the store; the Bitbucket app reads and writes it over the Jira REST API | Taken as the working default on 30 Oct. Benjamin can still overrule before Phase 2. |
-| Re-check baseline (section 3)                           | Each finding gets a baseline commit that moves forward when a fix is confirmed                | Working default; built in Phase 2                                                   |
-| Block on any change to an audited file (section 3)      | Per-audit setting, on by default                                                              | Stored on each audit from Phase 1; enforced in Phase 2                              |
-| UI technology                                           | UI Kit (`@forge/react` 12), not Custom UI                                                     | Section 6                                                                           |
-| Storage                                                 | Forge KVS with prefixed keys, not custom entities                                             | Section 4                                                                           |
-| Import                                                  | Async queue consumer, idempotent                                                              | Section 7                                                                           |
+| Decision                                                | Choice                                                                             | Status                                                                      |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| How the Jira and Bitbucket apps share state (section 2) | Option A: Jira app is the store; the Bitbucket app reads it over the Jira REST API | Built on 17 Nov, read-only for now. Setup and design notes: `BITBUCKET.md`. |
+| Re-check baseline (section 3)                           | Each finding gets a baseline commit that moves forward when a fix is confirmed     | Working default; built in Phase 2                                           |
+| Block on any change to an audited file (section 3)      | Per-audit setting, on by default                                                   | Stored on each audit from Phase 1; enforced in Phase 2                      |
+| UI technology                                           | UI Kit (`@forge/react` 12), not Custom UI                                          | Section 6                                                                   |
+| Storage                                                 | Forge KVS with prefixed keys, not custom entities                                  | Section 4                                                                   |
+| Import                                                  | Async queue consumer, idempotent                                                   | Section 7                                                                   |
 
 ## 1. Spike: can one Forge app run in Jira and Bitbucket?
 
@@ -82,6 +82,15 @@ What this means for us:
 - **Demo video:** start a Bitbucket Premium trial on the demo workspace before recording, so the Merge button is actually disabled on camera.
 - **Judges:** most will be on a free workspace. They'll see the AuditGate check fail with the finding list, but the merge won't be blocked. `JUDGES.md` and the README must say this plainly, not hide it.
 - **Product copy:** "blocks the merge on Bitbucket Premium; shows a failing check on other plans."
+
+## 2b. What was built (17 Nov)
+
+- **Signed issue data.** The `auditgate` issue property (version 2) now carries what the merge check needs: the repo, audited commit, audited files, the block-on-unreviewed-changes setting, and every file a finding points at. The Jira app signs it with HMAC-SHA256 over canonical JSON, using a secret it creates on first use and keeps in encrypted KVS (`kvs.setSecret`). The Bitbucket app checks the signature with the same code (`packages/jira/src/property.ts`).
+- **Why per issue, not one record per audit:** a Jira project property would need the `manage:jira-project` scope. Copying the audit fields onto each issue needs no new scope.
+- **Connect Bitbucket** (Jira project page, project admins only) shows the site ID and the signing secret, and has a **Sign issues** button that re-runs the import job with nothing to import, so it only rewrites signed properties. Issues created before 17 Nov need this once.
+- **The merge check** (`apps/bitbucket`) runs on `on-code-pushed` and `on-merge`. It reads the Jira connection from encrypted KVS per repository, finds the repo's findings with JQL on the indexed `repo` path, rejects the whole check if any finding's signature fails, uses the newest audit, gets the diffstat from the audited commit to the PR head, and runs `packages/drift` and `packages/gate`. Any error fails the check with a message.
+- **Egress:** one host, `api.atlassian.com` (scoped API tokens only work through `api.atlassian.com/ex/jira/{cloudId}`), declared in the object form with `inScopeEUD: true`. The Jira app still has no egress.
+- **Not built yet:** writing drift back to Jira, and a re-review sign-off at a commit (`changesReviewed` in the gate).
 
 ## 3. Open question on the lifecycle: what "Re-check" compares against
 

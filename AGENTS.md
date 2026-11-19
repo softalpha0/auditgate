@@ -8,7 +8,7 @@ AuditGate turns smart-contract audit findings into Jira work and blocks a Bitbuc
 
 - Event: Atlassian Codegeist 2026, category Apps for Specialized Industries. Deadline 22 Dec 2026, 12:00 PT. We submit 21 Dec.
 - Bonus prizes: Best Agents (Rovo), Best app with Atlassian MCP, Best Marketplace published app.
-- Owner: Benjamin, solo, Windows and PowerShell. Give him PowerShell commands, in plain language.
+- Owner: softalpha0, solo, Windows and PowerShell. Give them PowerShell commands, in plain language.
 
 Done statement, MoSCoW, journeys, risks and schedule: `docs/PLAN.md`. Rules and judging: `docs/RULES.md`. Evidence and competitors: `docs/RESEARCH.md`. Architecture decisions: `docs/ARCHITECTURE.md`.
 

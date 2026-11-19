@@ -1,10 +1,4 @@
-import {
-  SEVERITY_RANK,
-  type Audit,
-  type Finding,
-  type Location,
-  type Severity,
-} from "@auditgate/core";
+import { type Audit, type Finding, type Location, type Severity } from "@auditgate/core";
 import {
   doc,
   heading,
@@ -15,20 +9,13 @@ import {
   type AdfBlock,
   type AdfDoc,
 } from "./adf.js";
-
-/** Issue property key written on every finding issue. Indexed for JQL by the manifest. */
-export const ISSUE_PROPERTY_KEY = "auditgate";
-
-export interface IssueProperty {
-  auditId: string;
-  findingId: string;
-  externalId: string;
-  severity: Severity;
-  /** Lower is more severe; lets JQL sort by severity. */
-  severityRank: number;
-  status: Finding["status"];
-  file: string;
-}
+import {
+  ISSUE_PROPERTY_KEY,
+  issueProperty,
+  signProperty,
+  type IssueProperty,
+  type PropertyAuditSource,
+} from "./property.js";
 
 const SOURCE_LABEL: Record<Finding["source"], string> = {
   slither: "Slither",
@@ -169,18 +156,6 @@ export function issueDescription(
   return doc(blocks);
 }
 
-export function issueProperty(finding: Finding): IssueProperty {
-  return {
-    auditId: finding.auditId,
-    findingId: finding.id,
-    externalId: finding.externalId,
-    severity: finding.severity,
-    severityRank: SEVERITY_RANK[finding.severity],
-    status: finding.status,
-    file: finding.file,
-  };
-}
-
 /** What the target project lets us set when creating an issue. */
 export interface CreateContext {
   projectId: string;
@@ -203,15 +178,23 @@ export interface IssueFields {
 /** Body of one element of POST /rest/api/3/issue/bulk. */
 export function createIssueBody(
   finding: Finding,
-  audit: Pick<Audit, "id" | "repo" | "auditedCommit" | "name">,
+  audit: PropertyAuditSource,
   ctx: CreateContext,
+  /** Signing secret. The Bitbucket merge check ignores unsigned properties. */
+  secret?: string,
 ): { fields: IssueFields; properties: { key: string; value: IssueProperty }[] } {
   const fields: IssueFields = {
     project: { id: ctx.projectId },
     issuetype: { id: ctx.issueTypeId },
     ...updateIssueFields(finding, audit, ctx),
   };
-  return { fields, properties: [{ key: ISSUE_PROPERTY_KEY, value: issueProperty(finding) }] };
+  const property = issueProperty(finding, audit);
+  return {
+    fields,
+    properties: [
+      { key: ISSUE_PROPERTY_KEY, value: secret ? signProperty(property, secret) : property },
+    ],
+  };
 }
 
 /** Fields for PUT /rest/api/3/issue/{key} on re-import. Project and type never change. */

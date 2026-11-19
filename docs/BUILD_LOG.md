@@ -30,7 +30,7 @@ Notes:
 - The Forge MCP server (`https://mcp.atlassian.com/v1/forge/mcp`) answers without auth. I called it directly for module lists, doc search and API specs. The ADS MCP server and the Forge AI plugin skills aren't connected in this environment; I'll use the `atlassian-design-tokens` tool on the Forge MCP server for tokens.
 - Custom merge checks block merges only on Bitbucket Premium. See `ARCHITECTURE.md` 2a.
 
-Waiting on Benjamin:
+Waiting on the owner:
 
 - Decision on the state-sharing option (A, B or C) and on the baseline-commit proposal.
 - Steps in `SETUP.md`: Forge login, dev site, Bitbucket workspace + demo repo push (send me the commit SHA), `forge create` x2, GitHub repo.
@@ -54,7 +54,7 @@ Notes:
 - The brief's sample merge message lists a drifted M-02. Under the gate rule, Medium findings never block, so the real message would leave it out. The code follows the rule.
 - The baseline-commit question (ARCHITECTURE.md section 3) is still open. The drift package takes changes from any baseline, so either answer works without rewriting it.
 
-Next, blocked on Benjamin: `forge create` for the Jira app, then the New audit form, bulk issue creation and the issue panel.
+Next, blocked on the owner: `forge create` for the Jira app, then the New audit form, bulk issue creation and the issue panel.
 
 ### 30 Oct: Phase 1, the Jira app
 
@@ -117,3 +117,13 @@ Self-score today: technical 5, design 4, impact 4, innovation 7, presentation 1.
 - Jira app: **Check a change** on the audit page. Paste changed files; see which audited files changed, the findings they affect, out-of-scope files, and what the release gate would say. Read-only. Uses the same drift and gate code the merge check will use.
 - 154 tests (was 146). Manifest valid and app bundles under Forge CLI 15.0.0.
 - `JUDGES.md`: test steps for the first version. `FAST_SUBMIT.md`: two-day path to a first Devpost submission, then keep editing until 21 Dec.
+
+## Week 3
+
+### 9 Nov: priority fix, found on the real site
+
+Using the Atlassian MCP connector on softalpha-dev: all 11 imported issues had Medium priority. The team-managed project's create screen has no Priority field, so AuditGate left it out, but Jira accepts it on edit. The import now sets priority right after creating when the create screen lacks it (read from editmeta, `read:jira-work`). The 11 live issues were corrected through the connector. Deployed as 2.3.0.
+
+### 17 Nov: the Bitbucket merge check
+
+Built `apps/bitbucket` (merge check plus a repository settings page) and the Jira side it needs: signed issue data, a `repo` index and the Connect Bitbucket page. Design in `ARCHITECTURE.md` section 2b, setup in `BITBUCKET.md`. 194 tests pass. Both manifests and bundles pass the offline Forge check. Not yet run on a real Bitbucket workspace.

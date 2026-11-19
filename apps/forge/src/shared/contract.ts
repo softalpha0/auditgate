@@ -171,6 +171,16 @@ export interface CheckChangeResult {
   outOfScopeFiles: string[];
 }
 
+/** What a project admin pastes into the AuditGate Bitbucket app's repository settings. */
+export interface BitbucketSetup {
+  cloudId: string;
+  siteUrl: string;
+  /** Lets the Bitbucket app check that AuditGate data on issues wasn't edited by hand. */
+  signingSecret: string;
+  /** Repositories this project's audits cover, with their audits, newest first. */
+  repos: { repo: string; audits: { id: string; name: string }[] }[];
+}
+
 /** Every resolver returns either data or a plain-language error. Never throws to the UI. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -184,4 +194,6 @@ export const RESOLVERS = {
   getPanel: "getPanel",
   changeStatus: "changeStatus",
   checkChange: "checkChange",
+  bitbucketSetup: "bitbucketSetup",
+  signIssues: "signIssues",
 } as const;

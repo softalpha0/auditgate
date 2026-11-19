@@ -1,6 +1,7 @@
 import Resolver from "@forge/resolver";
 import type {
   AuditDetail,
+  BitbucketSetup,
   AuditSummary,
   ChangeStatusInput,
   CheckChangeInput,
@@ -19,6 +20,10 @@ import * as service from "./service";
 
 interface Ctx {
   accountId?: string;
+  cloudId?: string;
+  siteUrl?: string;
+  /** e.g. "ari:cloud:jira::site/<cloudId>". Fallback when cloudId is missing. */
+  installContext?: string;
   extension?: {
     project?: { id?: string | number; key?: string };
     issue?: { id?: string | number; key?: string };
@@ -53,6 +58,11 @@ function caller(ctx: Ctx): service.Caller {
   return { ...project(ctx), accountId: ctx.accountId };
 }
 
+function site(ctx: Ctx): { cloudId?: string; siteUrl?: string } {
+  const cloudId = ctx.cloudId ?? ctx.installContext?.match(/site\/([0-9a-f-]{36})/)?.[1];
+  return { ...(cloudId ? { cloudId } : {}), ...(ctx.siteUrl ? { siteUrl: ctx.siteUrl } : {}) };
+}
+
 function issueId(ctx: Ctx): string {
   const id = ctx.extension?.issue?.id;
   if (id === undefined) throw new UserError("Open this panel from a Jira issue.");
@@ -79,6 +89,12 @@ const projectResolver = new Resolver()
     RESOLVERS.checkChange,
     ({ payload, context }) =>
       run(() => service.checkChange(deps, project(context).projectId, payload)),
+  )
+  .define<void, Result<BitbucketSetup>>(RESOLVERS.bitbucketSetup, ({ context }) =>
+    run(() => service.bitbucketSetup(deps, caller(context), site(context))),
+  )
+  .define<{ auditId: string }, Result<AuditSummary>>(RESOLVERS.signIssues, ({ payload, context }) =>
+    run(() => service.signIssues(deps, caller(context), payload)),
   );
 
 const panelResolver = new Resolver()

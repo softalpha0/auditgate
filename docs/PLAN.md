@@ -86,7 +86,7 @@ If that works end to end on a fresh site, the MVP is done. Everything else is ex
 
 | #   | Risk                                                                                                                  | Why it matters                                 | How we retire it                                                                                                                              | By               |
 | --- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| R1  | The Jira app has never run on a real site                                                                             | Everything depends on it                       | Benjamin deploys and installs it (SETUP.md step 6); I fix what breaks                                                                         | Sun 8 Nov        |
+| R1  | The Jira app has never run on a real site                                                                             | Everything depends on it                       | the owner deploys and installs it (SETUP.md step 6); I fix what breaks                                                                        | Sun 8 Nov        |
 | R2  | The Bitbucket app can't call the Jira REST API from Forge (egress to the customer's `*.atlassian.net`, token storage) | Option A, and so the whole gate, depends on it | **Spike**: a minimal Bitbucket app with a merge check that reads one issue's AuditGate property over the Jira API and passes or fails on it   | Sun 8 Nov        |
 | R3  | Judges can't set up two apps, or don't have Bitbucket Premium                                                         | A gate judges can't see scores nothing         | Ask organizers (RULES.md questions 1 and 2). Build the "Check a change" panel as a fallback. Write and test JUDGES.md on a second fresh site. | Ask by Wed 4 Nov |
 | R4  | `rovo:mcp` external access doesn't work as documented (Preview)                                                       | MCP bonus                                      | Spike with one tool from Claude Code; fall back to Rovo Studio and say so                                                                     | Sun 22 Nov       |
@@ -95,20 +95,20 @@ If that works end to end on a fresh site, the MVP is done. Everything else is ex
 
 ## 7a. First submission (4–5 Nov)
 
-Benjamin wants to submit now. Devpost allows edits until the deadline, so we submit a working first version (the Jira app, with Check a change) as soon as it has run on a real site, then keep improving the same submission. Steps: `FAST_SUBMIT.md`. Nothing goes in the video or description that doesn't work on a fresh site.
+The owner wants to submit now. Devpost allows edits until the deadline, so we submit a working first version (the Jira app, with Check a change) as soon as it has run on a real site, then keep improving the same submission. Steps: `FAST_SUBMIT.md`. Nothing goes in the video or description that doesn't work on a fresh site.
 
 ## 7. Schedule (planned backwards from 21 Dec)
 
-| Week | Dates          | Focus                                                                                      | Done when                                                                                |
-| ---- | -------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| 1    | 27 Oct – 2 Nov | Setup, parsers, Jira app written                                                           | Done. Not yet deployed.                                                                  |
-| 2    | 3 – 9 Nov      | **R1 + R2**: deploy the Jira app; Bitbucket spike; ask the organizers; start interviews    | Jira app running on Benjamin's site with screenshots; spike proves or rules out Option A |
-| 3    | 10 – 16 Nov    | F3 merge check, Re-check, "Check a change" panel; first production deploy and install link | A PR on `vault-v2` is blocked and then passes; install link tested on a second site      |
-| 4    | 17 – 23 Nov    | F4 Rovo agent and actions; R4 MCP spike; Marketplace requirements list                     | 10 agent test questions pass                                                             |
-| 5    | 24 – 30 Nov    | F5 MCP, F6 dashboard and sign-off, JUDGES.md                                               | Tools callable; a stranger follows JUDGES.md without help                                |
-| 6    | 1 – 7 Dec      | **Feature freeze Thu 3 Dec.** Landing page, privacy, terms; Marketplace submitted          | Review ticket link saved in `evidence/`                                                  |
-| 7    | 8 – 14 Dec     | Video, README, Devpost draft                                                               | Video under 3 minutes, uploaded unlisted                                                 |
-| 8    | 15 – 21 Dec    | Fresh-site test, fixes, **submit Mon 21 Dec**                                              | Submitted, every link checked from another device                                        |
+| Week | Dates          | Focus                                                                                      | Done when                                                                                 |
+| ---- | -------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| 1    | 27 Oct – 2 Nov | Setup, parsers, Jira app written                                                           | Done. Not yet deployed.                                                                   |
+| 2    | 3 – 9 Nov      | **R1 + R2**: deploy the Jira app; Bitbucket spike; ask the organizers; start interviews    | Jira app running on the owner's site with screenshots; spike proves or rules out Option A |
+| 3    | 10 – 16 Nov    | F3 merge check, Re-check, "Check a change" panel; first production deploy and install link | A PR on `vault-v2` is blocked and then passes; install link tested on a second site       |
+| 4    | 17 – 23 Nov    | F4 Rovo agent and actions; R4 MCP spike; Marketplace requirements list                     | 10 agent test questions pass                                                              |
+| 5    | 24 – 30 Nov    | F5 MCP, F6 dashboard and sign-off, JUDGES.md                                               | Tools callable; a stranger follows JUDGES.md without help                                 |
+| 6    | 1 – 7 Dec      | **Feature freeze Thu 3 Dec.** Landing page, privacy, terms; Marketplace submitted          | Review ticket link saved in `evidence/`                                                   |
+| 7    | 8 – 14 Dec     | Video, README, Devpost draft                                                               | Video under 3 minutes, uploaded unlisted                                                  |
+| 8    | 15 – 21 Dec    | Fresh-site test, fixes, **submit Mon 21 Dec**                                              | Submitted, every link checked from another device                                         |
 
 The 30-minute rule applies throughout: if one problem has eaten 30 minutes, start a fresh session, try a simpler way, ask in the forum, or cut it.
 

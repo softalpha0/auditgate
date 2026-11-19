@@ -241,6 +241,19 @@ export const forgeUserJira: UserJira = {
     return (body.issueTypes?.length ?? 0) > 0;
   },
 
+  async canAdministerProject(projectId) {
+    const res = await api
+      .asUser()
+      .requestJira(
+        route`/rest/api/3/mypermissions?projectId=${projectId}&permissions=ADMINISTER_PROJECTS`,
+      );
+    if (!res.ok) return false;
+    const body = (await res.json()) as {
+      permissions?: { ADMINISTER_PROJECTS?: { havePermission?: boolean } };
+    };
+    return body.permissions?.ADMINISTER_PROJECTS?.havePermission === true;
+  },
+
   async visibleProject(projectIdOrKey) {
     if (!/^[A-Za-z0-9_-]{1,50}$/.test(projectIdOrKey)) return null;
     const res = await api.asUser().requestJira(route`/rest/api/3/project/${projectIdOrKey}`);

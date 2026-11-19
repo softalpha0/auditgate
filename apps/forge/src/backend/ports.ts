@@ -68,8 +68,15 @@ export interface Jira {
 /** The user-facing check: can this person create issues in the project? */
 export interface UserJira {
   canCreateIssues(projectId: string): Promise<boolean>;
+  /** True when the current user has Administer Projects on this project. */
+  canAdministerProject(projectId: string): Promise<boolean>;
   /** The project as the current user sees it, or null if it doesn't exist or they can't browse it. */
   visibleProject(projectIdOrKey: string): Promise<{ id: string; key: string; name: string } | null>;
+}
+
+/** The secret that signs AuditGate data on issues. Created on first use, kept in encrypted storage. */
+export interface Secrets {
+  signingSecret(): Promise<string>;
 }
 
 export interface ImportQueue {

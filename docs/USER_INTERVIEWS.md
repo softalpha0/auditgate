@@ -2,7 +2,7 @@
 
 "Potential impact" is 20% of the score, and it asks for a credible case for a real audience. Right now our case rests on published sources only. Three to five short conversations with real people will change that, and one good quote opens the video.
 
-Owner: Benjamin. Target: **5 conversations by Sun 15 Nov.** 20 minutes each is enough.
+Owner: softalpha0. Target: **5 conversations by Sun 15 Nov.** 20 minutes each is enough.
 
 ## Who to talk to
 

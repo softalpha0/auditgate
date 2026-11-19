@@ -26,6 +26,7 @@ import { SEVERITIES, type Severity } from "@auditgate/core";
 import type {
   AuditDetail,
   AuditSummary,
+  BitbucketSetup,
   CheckChangeResult,
   CreateAuditInput,
   ImportStatus,
@@ -36,7 +37,8 @@ import { RESOLVERS } from "../shared/contract";
 import { call } from "./api";
 import { SeverityLozenge, StatusLozenge, formatDate, plural, shortSha } from "./labels";
 
-type View = { name: "list" } | { name: "new" } | { name: "audit"; id: string };
+type View =
+  { name: "list" } | { name: "new" } | { name: "audit"; id: string } | { name: "bitbucket" };
 
 const card = xcss({
   padding: "space.200",
@@ -100,7 +102,15 @@ const ImportMessage = ({ status }: { status: ImportStatus }) => {
 
 // ---------- List ----------
 
-const AuditList = ({ open, create }: { open: (id: string) => void; create: () => void }) => {
+const AuditList = ({
+  open,
+  create,
+  connect,
+}: {
+  open: (id: string) => void;
+  create: () => void;
+  connect: () => void;
+}) => {
   const [audits, setAudits] = useState<AuditSummary[] | null>(null);
   const [error, setError] = useState<string>();
 
@@ -181,9 +191,12 @@ const AuditList = ({ open, create }: { open: (id: string) => void; create: () =>
     <Stack space="space.200">
       <Inline spread="space-between" alignBlock="center">
         <Text>{plural(audits.length, "audit")}</Text>
-        <Button appearance="primary" onClick={create}>
-          New audit
-        </Button>
+        <Inline space="space.100">
+          <Button onClick={connect}>Connect Bitbucket</Button>
+          <Button appearance="primary" onClick={create}>
+            New audit
+          </Button>
+        </Inline>
       </Inline>
       <DynamicTable head={head} rows={rows} label="Audits" />
     </Stack>
@@ -759,6 +772,133 @@ const AuditPage = ({ id, back }: { id: string; back: () => void }) => {
   );
 };
 
+// ---------- Connect Bitbucket ----------
+
+const SetupValue = ({ label, value }: { label: string; value: string }) => (
+  <Stack space="space.050">
+    <Text weight="bold">{label}</Text>
+    <Code>{value}</Code>
+  </Stack>
+);
+
+const ConnectBitbucket = ({ back }: { back: () => void }) => {
+  const [setup, setSetup] = useState<BitbucketSetup>();
+  const [error, setError] = useState<string>();
+  const [showSecret, setShowSecret] = useState(false);
+  const [signing, setSigning] = useState<string>();
+  const [signed, setSigned] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    call<BitbucketSetup>(RESOLVERS.bitbucketSetup).then((r) =>
+      r.ok ? setSetup(r.data) : setError(r.error),
+    );
+  }, []);
+
+  const sign = async (auditId: string) => {
+    setSigning(auditId);
+    const r = await call<AuditSummary>(RESOLVERS.signIssues, { auditId });
+    setSigning(undefined);
+    setSigned((prev) => ({
+      ...prev,
+      [auditId]: r.ok ? "Signing started. It takes a few seconds per issue." : r.error,
+    }));
+  };
+
+  return (
+    <Stack space="space.200">
+      <Inline>
+        <Button appearance="subtle" onClick={back}>
+          Back to audits
+        </Button>
+      </Inline>
+      <Heading as="h2" size="medium">
+        Connect Bitbucket
+      </Heading>
+      <Text>
+        The AuditGate merge check runs in Bitbucket and reads this project&apos;s findings from
+        Jira. It blocks a pull request while a Critical or High finding is open, or while it changes
+        audited code that nobody has re-reviewed.
+      </Text>
+      {error && (
+        <SectionMessage appearance="warning" title="Can't show the setup">
+          <Text>{error}</Text>
+        </SectionMessage>
+      )}
+      {!setup && !error && <Spinner label="Loading setup" />}
+      {setup && (
+        <Stack space="space.300">
+          <Box xcss={card}>
+            <Stack space="space.150">
+              <Heading as="h3" size="small">
+                1. Paste these into Bitbucket
+              </Heading>
+              <Text>
+                In each repository below, open Repository settings, then AuditGate under Forge Apps.
+              </Text>
+              <SetupValue label="Jira site ID" value={setup.cloudId} />
+              <Stack space="space.050">
+                <Text weight="bold">Signing secret</Text>
+                {showSecret ? (
+                  <Code>{setup.signingSecret}</Code>
+                ) : (
+                  <Inline>
+                    <Button onClick={() => setShowSecret(true)}>Show signing secret</Button>
+                  </Inline>
+                )}
+                <HelperMessage>
+                  Treat it like a password. With it, someone could make edited finding data look
+                  genuine to the merge check.
+                </HelperMessage>
+              </Stack>
+              <Text>
+                Bitbucket also asks for your Atlassian account email and an API token. Create the
+                token at id.atlassian.com, under Security, with the scope read:jira-work only. The
+                merge check never changes anything in Jira.
+              </Text>
+              <Link href="https://id.atlassian.com/manage-profile/security/api-tokens" openNewTab>
+                Create an API token
+              </Link>
+            </Stack>
+          </Box>
+          <Box xcss={card}>
+            <Stack space="space.150">
+              <Heading as="h3" size="small">
+                2. Sign the existing issues
+              </Heading>
+              <Text>
+                Issues created before this version don&apos;t carry signed data yet, and the merge
+                check ignores data it can&apos;t verify. Do this once per audit. New imports and
+                status changes are signed automatically.
+              </Text>
+              {setup.repos.length === 0 && <Text>No audits in this project yet.</Text>}
+              {setup.repos.map(({ repo, audits }) => (
+                <Stack key={repo} space="space.100">
+                  <Text weight="bold">{repo}</Text>
+                  {audits.map((a) => (
+                    <Stack key={a.id} space="space.050">
+                      <Inline space="space.100" alignBlock="center">
+                        <Text>{a.name}</Text>
+                        <LoadingButton isLoading={signing === a.id} onClick={() => sign(a.id)}>
+                          Sign issues
+                        </LoadingButton>
+                      </Inline>
+                      {signed[a.id] && (
+                        <Text size="small" color="color.text.subtle">
+                          {signed[a.id]}
+                        </Text>
+                      )}
+                    </Stack>
+                  ))}
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+        </Stack>
+      )}
+    </Stack>
+  );
+};
+
 const App = () => {
   const [view, setView] = useState<View>({ name: "list" });
   const toList = useCallback(() => setView({ name: "list" }), []);
@@ -766,7 +906,14 @@ const App = () => {
 
   if (view.name === "new") return <NewAudit done={open} cancel={toList} />;
   if (view.name === "audit") return <AuditPage id={view.id} back={toList} />;
-  return <AuditList open={open} create={() => setView({ name: "new" })} />;
+  if (view.name === "bitbucket") return <ConnectBitbucket back={toList} />;
+  return (
+    <AuditList
+      open={open}
+      create={() => setView({ name: "new" })}
+      connect={() => setView({ name: "bitbucket" })}
+    />
+  );
 };
 
 ForgeReconciler.render(

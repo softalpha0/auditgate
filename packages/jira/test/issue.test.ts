@@ -24,6 +24,9 @@ const audit = {
   name: "Vault v2 audit",
   repo: { workspace: "auditgate-demo", slug: "vault-v2" },
   auditedCommit: "3f1c2a9e0b7d4c6a8e5f1b2c3d4e5f6a7b8c9d0e",
+  auditedFiles: ["src/PriceOracle.sol", "src/RewardsDistributor.sol", "src/TokenVault.sol"],
+  createdAt: "2026-11-02T09:00:00.000Z",
+  settings: { blockOnUnreviewedChanges: true },
 };
 const priorities = ["Highest", "High", "Medium", "Low", "Lowest"].map((name, i) => ({
   id: String(i + 1),
@@ -101,6 +104,7 @@ describe("createIssueBody", () => {
       {
         key: ISSUE_PROPERTY_KEY,
         value: {
+          v: 2,
           auditId: "a1b2c3",
           findingId: byId("C-01").id,
           externalId: "C-01",
@@ -108,6 +112,21 @@ describe("createIssueBody", () => {
           severityRank: 0,
           status: "Open",
           file: "src/PriceOracle.sol",
+          files: ["src/PriceOracle.sol"],
+          repo: "auditgate-demo/vault-v2",
+          audit: {
+            id: "a1b2c3",
+            name: "Vault v2 audit",
+            repo: "auditgate-demo/vault-v2",
+            auditedCommit: "3f1c2a9e0b7d4c6a8e5f1b2c3d4e5f6a7b8c9d0e",
+            auditedFiles: [
+              "src/PriceOracle.sol",
+              "src/RewardsDistributor.sol",
+              "src/TokenVault.sol",
+            ],
+            blockOnUnreviewedChanges: true,
+            createdAt: "2026-11-02T09:00:00.000Z",
+          },
         },
       },
     ]);

@@ -1,0 +1,49 @@
+# AuditGate for Bitbucket: the merge check.
+# This is a separate Forge app from the Jira one, because one Forge app can't run in both.
+# `forge register` replaces the placeholder app id below with your own. See docs/BITBUCKET.md.
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+
+modules:
+  bitbucket:mergeCheck:
+    - key: auditgate-merge-check
+      function: merge-check
+      name: AuditGate
+      description: Blocks the merge while a Critical or High audit finding is open in Jira, or while the pull request changes audited code without a re-review.
+      triggers:
+        - on-code-pushed
+        - on-merge
+
+  bitbucket:repoSettingsMenuPage:
+    - key: auditgate-settings
+      title: AuditGate
+      resource: settings
+      render: native
+      resolver:
+        function: settings-resolver
+
+  function:
+    - key: merge-check
+      handler: index.mergeCheck
+    - key: settings-resolver
+      handler: index.settingsHandler
+
+resources:
+  - key: settings
+    path: src/frontend/settings.tsx
+
+permissions:
+  scopes:
+    - read:repository:bitbucket # repository name and the diff against the audited commit
+    - read:pullrequest:bitbucket # the pull request's latest commit
+    - storage:app # the Jira connection, in encrypted storage
+  external:
+    fetch:
+      backend:
+        # Jira Cloud REST API, read-only, with the API token a repository admin saves.
+        # inScopeEUD: finding data from the customer's Jira is end-user data.
+        - address: api.atlassian.com
+          inScopeEUD: true
