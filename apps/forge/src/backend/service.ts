@@ -241,6 +241,12 @@ export async function reimport(
   return summarize(updated, merge.findings);
 }
 
+/** Jira Cloud's default priority scheme. */
+const STANDARD_PRIORITIES = ["Highest", "High", "Medium", "Low", "Lowest"].map((name, i) => ({
+  id: String(i + 1),
+  name,
+}));
+
 async function mapLimit<T>(
   items: T[],
   limit: number,
@@ -292,11 +298,15 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
 
     // Team-managed projects often leave Priority off the create screen but allow it on edit.
     // Then the priority is set right after each issue is created. Looked up once per run.
-    let editPriorities: { id: string; name: string }[] | undefined | null = null;
+    // Some projects leave Priority out of the edit metadata too, yet Jira still accepts it
+    // (seen on a real team-managed project). Then try Jira Cloud's standard priorities; if
+    // the site uses others, the edit fails and the import says so.
+    let editPriorities: { id: string; name: string }[] | null = null;
     const prioritiesForEdit = async (issueKey: string) => {
       if (ctx.priorities) return ctx.priorities;
       if (editPriorities === null) {
-        editPriorities = await deps.jira.editPriorities(issueKey).catch(() => undefined);
+        editPriorities =
+          (await deps.jira.editPriorities(issueKey).catch(() => undefined)) ?? STANDARD_PRIORITIES;
       }
       return editPriorities;
     };
@@ -415,10 +425,12 @@ export async function runImport(deps: Deps, job: ImportJob): Promise<void> {
       await save();
     }
 
+    // Re-imports send priority in the same edit as the summary and description, so only use
+    // priorities Jira listed. A guess that's wrong for this site would fail the whole update.
     const editCtx: CreateContext = { ...ctx };
     if (toUpdate[0]?.jiraKey && !ctx.priorities) {
       const allowed = await prioritiesForEdit(toUpdate[0].jiraKey);
-      if (allowed) editCtx.priorities = allowed;
+      if (allowed !== STANDARD_PRIORITIES) editCtx.priorities = allowed;
     }
     await mapLimit(toUpdate, UPDATE_CONCURRENCY, async (finding) => {
       try {

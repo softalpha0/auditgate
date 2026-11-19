@@ -173,7 +173,7 @@ describe("runImport", () => {
     const { id } = await createAudit(deps, caller, input());
     await runImport(deps, jobs.shift()!);
     expect(jira.issues).toHaveLength(11);
-    expect(jira.issues.every((i) => !i.fields.labels && !i.fields.priority)).toBe(true);
+    expect(jira.issues.every((i) => !i.fields.labels)).toBe(true);
     const audit = await store.getAudit("10000", id);
     expect(audit?.import.state).toBe("done");
     expect(audit?.import.messages[0]).toMatch(/without labels or priority/);
@@ -196,6 +196,20 @@ describe("runImport", () => {
     expect(jira.priorityEdits).toHaveLength(11);
     const audit = await store.getAudit("10000", id);
     expect(audit?.import).toMatchObject({ state: "done", created: 11, failed: 0 });
+  });
+
+  it("falls back to Jira's standard priorities when edit metadata doesn't list Priority", async () => {
+    // Seen on softalpha-dev: Priority missing from create and edit metadata, but editable.
+    const { deps, jira, jobs } = makeDeps();
+    delete jira.context.priorities;
+    jira.editablePriorities = undefined;
+    await createAudit(deps, caller, input());
+    await runImport(deps, jobs.shift()!);
+    const priorityOf = (externalId: string) =>
+      jira.issues.find((i) => i.property.externalId === externalId)?.fields.priority?.id;
+    expect(priorityOf("C-01")).toBe("1");
+    expect(priorityOf("G-01")).toBe("5");
+    expect(jira.priorityEdits).toHaveLength(11);
   });
 
   it("still finishes the import when priority can't be set after creating", async () => {
