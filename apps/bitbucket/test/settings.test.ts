@@ -6,6 +6,7 @@ import { CheckError, type FindingIssue, type JiraConfig } from "../src/backend/c
 import {
   getSettings,
   repoFromLocation,
+  resolveWhere,
   saveSettings,
   type SettingsDeps,
 } from "../src/backend/settings";
@@ -58,6 +59,30 @@ describe("settings page", () => {
       ),
     ).toBe("auditgate-demo/vault-v2");
     expect(repoFromLocation("not a url")).toBeUndefined();
+  });
+
+  it("finds the repository from the workspace and repository IDs Forge passes", async () => {
+    // Seen on bitbucket.org: the resolver context has workspaceId and repository.uuid, no URL.
+    const calls: string[][] = [];
+    const bitbucket = {
+      repoFullName: async (ws: string, repo: string) => {
+        calls.push([ws, repo]);
+        return "AuditGate-Demo/vault-v2";
+      },
+    };
+    await expect(
+      resolveWhere(
+        { workspaceId: "{ws-1}", extension: { repository: { uuid: "{r-1}" } } },
+        bitbucket,
+      ),
+    ).resolves.toEqual({ repoUuid: "r-1", repo: "auditgate-demo/vault-v2" });
+    expect(calls).toEqual([["{ws-1}", "{r-1}"]]);
+    await expect(resolveWhere({ workspaceId: "{ws-1}" }, bitbucket)).rejects.toThrow(
+      /repository's settings/,
+    );
+    await expect(
+      resolveWhere({ extension: { repository: { uuid: "{r-1}" } } }, bitbucket),
+    ).rejects.toThrow(/which workspace/);
   });
 
   it("checks the values against Jira, then saves them", async () => {

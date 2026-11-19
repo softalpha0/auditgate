@@ -6,14 +6,15 @@ import type {
   SettingsStatus,
 } from "../shared/contract";
 import { RESOLVERS } from "../shared/contract";
-import { CheckError, runMergeCheck, unwrapUuid, type MergeCheckEvent } from "./check";
+import { CheckError, runMergeCheck, type MergeCheckEvent } from "./check";
 import { deleteConfig, forgeBitbucket, forgeJira, loadConfig, saveConfig } from "./forge";
 import {
   SettingsError,
   disconnect,
   getSettings,
-  repoFromLocation,
+  resolveWhere,
   saveSettings,
+  type PageContext,
   type SettingsDeps,
   type Where,
 } from "./settings";
@@ -45,15 +46,8 @@ const settingsDeps: SettingsDeps = {
   jira: forgeJira,
 };
 
-interface Ctx {
-  extension?: { repository?: { uuid?: string }; location?: string };
-}
-
-function where(ctx: Ctx): Where {
-  const uuid = ctx.extension?.repository?.uuid;
-  const repo = repoFromLocation(ctx.extension?.location);
-  if (!uuid || !repo) throw new SettingsError("Open this page from a repository's settings.");
-  return { repoUuid: unwrapUuid(uuid), repo };
+function where(ctx: PageContext): Promise<Where> {
+  return resolveWhere(ctx, forgeBitbucket);
 }
 
 async function run<T>(fn: () => Promise<T>): Promise<Result<T>> {
@@ -68,15 +62,16 @@ async function run<T>(fn: () => Promise<T>): Promise<Result<T>> {
 
 export const settingsHandler = new Resolver()
   .define<void, Result<SettingsStatus>>(RESOLVERS.getSettings, ({ context }) =>
-    run(() => getSettings(settingsDeps, where(context))),
+    run(async () => getSettings(settingsDeps, await where(context))),
   )
   .define<SaveSettingsInput, Result<SaveSettingsResult>>(
     RESOLVERS.saveSettings,
-    ({ payload, context }) => run(() => saveSettings(settingsDeps, where(context), payload)),
+    ({ payload, context }) =>
+      run(async () => saveSettings(settingsDeps, await where(context), payload)),
   )
   .define<void, Result<null>>(RESOLVERS.disconnect, ({ context }) =>
     run(async () => {
-      await disconnect(settingsDeps, where(context));
+      await disconnect(settingsDeps, await where(context));
       return null;
     }),
   )

@@ -1,6 +1,6 @@
 import { verifyProperty, type IssueProperty } from "@auditgate/jira";
 import type { SaveSettingsInput, SaveSettingsResult, SettingsStatus } from "../shared/contract";
-import { CheckError, type Jira, type JiraConfig } from "./check";
+import { CheckError, unwrapUuid, type Bitbucket, type Jira, type JiraConfig } from "./check";
 
 /** A problem the admin can fix, shown on the settings page as is. */
 export class SettingsError extends Error {
@@ -27,6 +27,38 @@ export function repoFromLocation(location: string | undefined): string | undefin
     return workspace && slug ? `${workspace}/${slug}`.toLowerCase() : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** What Forge passes a resolver on the repository settings page. */
+export interface PageContext {
+  workspaceId?: string;
+  extension?: { repository?: { uuid?: string }; location?: string };
+}
+
+/**
+ * Works out which repository the settings page is for. Resolvers get the workspace and
+ * repository IDs (the page URL only reaches the frontend), so the name comes from Bitbucket.
+ */
+export async function resolveWhere(
+  ctx: PageContext,
+  bitbucket: Pick<Bitbucket, "repoFullName">,
+): Promise<Where> {
+  const repoUuid = ctx.extension?.repository?.uuid;
+  if (!repoUuid) throw new SettingsError("Open this page from a repository's settings.");
+  const fromUrl = repoFromLocation(ctx.extension?.location);
+  if (fromUrl) return { repoUuid: unwrapUuid(repoUuid), repo: fromUrl };
+  if (!ctx.workspaceId) {
+    throw new SettingsError("Bitbucket didn't say which workspace this is. Reload the page.");
+  }
+  try {
+    const repo = (await bitbucket.repoFullName(ctx.workspaceId, repoUuid)).toLowerCase();
+    return { repoUuid: unwrapUuid(repoUuid), repo };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new SettingsError(`Couldn't read this repository from Bitbucket: ${error.message}`);
+    }
+    throw error;
   }
 }
 
