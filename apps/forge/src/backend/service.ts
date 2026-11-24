@@ -31,6 +31,8 @@ import {
 import type {
   AuditDetail,
   BitbucketSetup,
+  ReviewSignOff,
+  SignOffInput,
   AuditSummary,
   ChangeStatusInput,
   CheckChangeInput,
@@ -607,13 +609,81 @@ export async function getAudit(
   findings.sort(
     (a, b) => compareSeverity(a.severity, b.severity) || a.externalId.localeCompare(b.externalId),
   );
+  const reviews = [...(audit.reviews ?? [])].reverse();
+  const names = reviews.length
+    ? await deps.jira.getUserNames([...new Set(reviews.map((r) => r.by))])
+    : {};
   return {
     summary: summarize(audit, findings),
     scope: audit.auditedFiles,
     settings: audit.settings,
     lastImport: audit.lastImport,
     findings: findings.map((f) => rowFor(audit, f)),
+    reviews: reviews.map((r) => ({ ...r, byName: names[r.by] ?? "A Jira user" })),
   };
+}
+
+const FULL_SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * A reviewer signs off every change since the audit, up to one commit: normally the head of the
+ * pull request they reviewed. Findings marked fixed become Verified, and the merge check passes
+ * for exactly that commit if no Critical or High finding is still open. The next commit that
+ * touches audited code needs a new sign-off. Project admins only, like Connect Bitbucket.
+ */
+export async function signOffReview(
+  deps: Deps,
+  caller: Caller,
+  input: SignOffInput,
+): Promise<AuditDetail> {
+  await requireProjectAdmin(deps, caller.projectId);
+  const audit = await deps.store.getAudit(caller.projectId, input.auditId);
+  if (!audit) throw new UserError("That audit doesn't exist in this project any more.");
+  const commit = (input.commit ?? "").trim().toLowerCase();
+  const note = (input.note ?? "").trim().slice(0, 500);
+  const problems: string[] = [];
+  if (!FULL_SHA.test(commit)) {
+    problems.push(
+      "Enter the full 40-character commit you reviewed. In the repo, run: git rev-parse HEAD",
+    );
+  }
+  if (!note) problems.push("Say what you reviewed, for example the pull request.");
+  if (problems.length) throw new UserError(problems.join(" "));
+  if (audit.import.state === "queued" || audit.import.state === "running") {
+    throw new UserError("An import for this audit is still running. Try again when it finishes.");
+  }
+
+  const at = deps.now();
+  const findings = await deps.store.listFindings(audit.id);
+  const verified: StoredFinding[] = [];
+  for (const finding of findings) {
+    if (finding.status !== "FixedPendingRecheck") continue;
+    verified.push(
+      transition(finding, {
+        to: "Verified",
+        by: caller.accountId,
+        at,
+        note: `Re-reviewed at ${commit.slice(0, 7)}: ${note}`.slice(0, 500),
+      }) as StoredFinding,
+    );
+  }
+  const review: ReviewSignOff = {
+    commit,
+    by: caller.accountId,
+    at,
+    note,
+    verified: verified.map((f) => f.externalId),
+  };
+  const updated: StoredAudit = {
+    ...audit,
+    reviews: [...(audit.reviews ?? []), review].slice(-50),
+    import: emptyImport(at, findings.filter((f) => f.jiraKey).length),
+  };
+  if (verified.length) await deps.store.putFindings(verified);
+  await deps.store.putAudit(updated);
+  // Re-sign every issue so the Bitbucket check sees the new statuses and the reviewed commit.
+  await deps.queue.push({ projectId: caller.projectId, auditId: audit.id });
+  return getAudit(deps, caller.projectId, audit.id);
 }
 
 /** Statuses a person can pick in the panel. Drifted comes from the drift check, Verified from Re-check. */

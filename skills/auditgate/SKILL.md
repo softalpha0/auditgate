@@ -30,15 +30,15 @@ A Jira site admin must first install AuditGate and allow external MCP access for
 
 1. For "safe to ship?", call `release-readiness` and lead with the verdict. List blocking findings most severe first, each with its Jira key.
 2. For "what changed?", run `git diff --name-status <auditedCommit> HEAD` in the repository yourself if you have a terminal, then pass the output to `check-drift`. If you can't run git, call `check-drift` with no files and relay the command it returns.
-3. Never claim a finding is fixed or verified unless a tool result says so. These tools can't change anything; status changes happen in the AuditGate panel on the Jira issue.
+3. Never claim a finding is fixed or verified unless a tool result says so. These tools can't change anything; status changes happen in the AuditGate panel on the Jira issue, and a project admin clears changed audited code with a re-review sign-off at a commit.
 4. Critical and High findings block a release while Open, In fix, Fixed awaiting re-check, or Drifted. Accepted risks don't block, but always mention them.
-5. Cite Jira keys (for example `VAULT-2`) so people can click through.
+5. Cite Jira keys (for example `KAN-13`) so people can click through.
 
 ## Example
 
 > **User:** Can we merge this branch?
 >
-> 1. `git diff --name-status 3f1c2a9e0b7d4c6a8e5f1b2c3d4e5f6a7b8c9d0e HEAD` gives `M src/RewardsDistributor.sol`
+> 1. `git diff --name-status 16b9a19b8abb41043380cdb80719b67e949b7aa1 HEAD` gives `M src/RewardsDistributor.sol`
 > 2. `check-drift` with that output gives `safeToMerge: false`, with M-02, M-03 and L-01 affected
 >
-> **Answer:** Not yet. `src/RewardsDistributor.sol` was audited and has changed, which affects M-02 (VAULT-6), M-03 (VAULT-7) and L-01 (VAULT-8). It needs a re-review. Four Critical/High findings are also still open: C-01 (VAULT-1), H-01 (VAULT-2), H-02 (VAULT-3), H-03 (VAULT-4).
+> **Answer:** Not yet. `src/RewardsDistributor.sol` was audited and has changed, which affects M-02 (KAN-17), M-03 (KAN-18) and L-01 (KAN-19). It needs a re-review. Four Critical/High findings are also still open: C-01 (KAN-12), H-01 (KAN-13), H-02 (KAN-14), H-03 (KAN-15).

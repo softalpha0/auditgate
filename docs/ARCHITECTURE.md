@@ -90,7 +90,8 @@ What this means for us:
 - **Connect Bitbucket** (Jira project page, project admins only) shows the site ID and the signing secret, and has a **Sign issues** button that re-runs the import job with nothing to import, so it only rewrites signed properties. Issues created before 17 Nov need this once.
 - **The merge check** (`apps/bitbucket`) runs on `on-code-pushed` and `on-merge`. It reads the Jira connection from encrypted KVS per repository, finds the repo's findings with JQL on the indexed `repo` path, rejects the whole check if any finding's signature fails, uses the newest audit, gets the diffstat from the audited commit to the PR head, and runs `packages/drift` and `packages/gate`. Any error fails the check with a message.
 - **Egress:** one host, `api.atlassian.com` (scoped API tokens only work through `api.atlassian.com/ex/jira/{cloudId}`), declared in the object form with `inScopeEUD: true`. The Jira app still has no egress.
-- **Not built yet:** writing drift back to Jira, and a re-review sign-off at a commit (`changesReviewed` in the gate).
+- **Re-review sign-off (23 Nov):** a project admin signs off every change up to one commit. Fixed findings become Verified, the commit is added to `audit.reviewedCommits` on every signed issue, and the merge check sets `changesReviewed` when the PR head matches (full hash, or a prefix of at least 12 characters, since Bitbucket abbreviates). With `changesReviewed`, the gate ignores drift for that commit; open Critical and High findings still block.
+- **Not built yet:** writing drift back to Jira.
 
 ## 3. Open question on the lifecycle: what "Re-check" compares against
 

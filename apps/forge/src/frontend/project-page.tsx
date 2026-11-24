@@ -746,6 +746,14 @@ const AuditPage = ({ id, back }: { id: string; back: () => void }) => {
         <CheckChange auditId={summary.id} auditedCommit={summary.auditedCommit} />
       ) : null}
 
+      {!importing ? (
+        <ReviewSignOff
+          auditId={summary.id}
+          reviews={detail.reviews}
+          onSigned={() => setTick((t) => t + 1)}
+        />
+      ) : null}
+
       <Box xcss={card}>
         <Stack space="space.150">
           <Heading as="h3" size="small">
@@ -769,6 +777,100 @@ const AuditPage = ({ id, back }: { id: string; back: () => void }) => {
         </Stack>
       </Box>
     </Stack>
+  );
+};
+
+// ---------- Re-review sign-off ----------
+
+const ReviewSignOff = ({
+  auditId,
+  reviews,
+  onSigned,
+}: {
+  auditId: string;
+  reviews: AuditDetail["reviews"];
+  onSigned: () => void;
+}) => {
+  const [commit, setCommit] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
+  const [done, setDone] = useState<string>();
+
+  const sign = async () => {
+    setSaving(true);
+    setError(undefined);
+    setDone(undefined);
+    const r = await call<AuditDetail>(RESOLVERS.signOffReview, { auditId, commit, note });
+    setSaving(false);
+    if (!r.ok) return setError(r.error);
+    const latest = r.data.reviews[0];
+    setDone(
+      latest && latest.verified.length
+        ? `Signed off. Verified: ${latest.verified.join(", ")}.`
+        : "Signed off. No findings were waiting for a re-check.",
+    );
+    setCommit("");
+    setNote("");
+    onSigned();
+  };
+
+  return (
+    <Box xcss={card}>
+      <Stack space="space.150">
+        <Heading as="h3" size="small">
+          Re-review sign-off
+        </Heading>
+        <Text>
+          Confirm that you reviewed every change since the audit, up to one commit, normally the
+          head of the pull request. Findings marked fixed become Verified, and the Bitbucket merge
+          check passes for exactly that commit if no Critical or High finding is still open. The
+          next commit that touches audited code needs a new sign-off. Project admins only.
+        </Text>
+        <Stack space="space.050">
+          <Label labelFor="signoff-commit">Reviewed commit</Label>
+          <Textfield
+            id="signoff-commit"
+            value={commit}
+            placeholder="e.g. 4ee607f… (all 40 characters)"
+            onChange={(e) => setCommit(String(e.target.value ?? ""))}
+          />
+          <HelperMessage>
+            In the repo, on the reviewed branch, run: git rev-parse HEAD
+          </HelperMessage>
+        </Stack>
+        <Stack space="space.050">
+          <Label labelFor="signoff-note">What you reviewed</Label>
+          <Textfield
+            id="signoff-note"
+            value={note}
+            placeholder="e.g. PR #1, fixes for C-01 and H-01 to H-03"
+            onChange={(e) => setNote(String(e.target.value ?? ""))}
+          />
+        </Stack>
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        {done && (
+          <SectionMessage appearance="success" title="Re-review recorded">
+            <Text>{done}</Text>
+          </SectionMessage>
+        )}
+        <Inline>
+          <LoadingButton appearance="primary" isLoading={saving} onClick={sign}>
+            Sign off this commit
+          </LoadingButton>
+        </Inline>
+        {reviews.length > 0 && (
+          <Stack space="space.075">
+            <Text weight="bold">Sign-offs</Text>
+            {reviews.slice(0, 5).map((r) => (
+              <Text key={`${r.commit}-${r.at}`} size="small">
+                {`${shortSha(r.commit)} · ${r.byName} · ${formatDate(r.at)} · ${r.note}${r.verified.length ? ` · verified ${r.verified.join(", ")}` : ""}`}
+              </Text>
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </Box>
   );
 };
 

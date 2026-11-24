@@ -12,6 +12,7 @@ import type {
   ReportPreview,
   ReportUpload,
   Result,
+  SignOffInput,
 } from "../shared/contract";
 import { RESOLVERS } from "../shared/contract";
 import { deps } from "./deps";
@@ -95,6 +96,9 @@ const projectResolver = new Resolver()
   )
   .define<{ auditId: string }, Result<AuditSummary>>(RESOLVERS.signIssues, ({ payload, context }) =>
     run(() => service.signIssues(deps, caller(context), payload)),
+  )
+  .define<SignOffInput, Result<AuditDetail>>(RESOLVERS.signOffReview, ({ payload, context }) =>
+    run(() => service.signOffReview(deps, caller(context), payload)),
   );
 
 const panelResolver = new Resolver()

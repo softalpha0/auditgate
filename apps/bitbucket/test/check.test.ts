@@ -29,7 +29,7 @@ const event: MergeCheckEvent = {
 
 function auditIssues(
   statuses: Partial<Record<string, FindingStatus>> = {},
-  audit: { id?: string; name?: string; createdAt?: string } = {},
+  audit: { id?: string; name?: string; createdAt?: string; reviewed?: string[] } = {},
 ): FindingIssue[] {
   const id = audit.id ?? "a1";
   const findings = toNewFindings(parseReport(md).findings, id);
@@ -47,6 +47,7 @@ function auditIssues(
           auditedFiles: ["src/PriceOracle.sol", "src/RewardsDistributor.sol", "src/TokenVault.sol"],
           createdAt: audit.createdAt ?? "2026-11-02T09:00:00.000Z",
           settings: { blockOnUnreviewedChanges: true },
+          reviews: (audit.reviewed ?? []).map((commit) => ({ commit })),
         },
       ),
       SECRET,
@@ -180,5 +181,34 @@ describe("merge check", () => {
     const result = await runMergeCheck(deps([...v1, ...v2]).d, event);
     expect(result.success).toBe(true);
     expect(result.message).toContain('"Vault v2 audit"');
+  });
+
+  it("passes a change to audited code once it is signed off at exactly that commit", async () => {
+    const head = `${HEAD}0123456789abcdef0123456789`;
+    const verified = {
+      "C-01": "Verified",
+      "H-01": "Verified",
+      "H-02": "Verified",
+      "H-03": "Verified",
+    } as const;
+    const signed = auditIssues(verified, { reviewed: [head] });
+    const result = await runMergeCheck(deps(signed, ["src/TokenVault.sol"]).d, event);
+    expect(result.success).toBe(true);
+    expect(result.message).toContain("Changes up to a1b2c3d were signed off in a re-review.");
+
+    const otherCommit = auditIssues(verified, { reviewed: ["f".repeat(40)] });
+    const blocked = await runMergeCheck(deps(otherCommit, ["src/TokenVault.sol"]).d, event);
+    expect(blocked.success).toBe(false);
+    expect(blocked.message).toMatch(/drifted/);
+  });
+
+  it("still blocks open serious findings after a sign-off", async () => {
+    const head = `${HEAD}0123456789abcdef0123456789`;
+    const result = await runMergeCheck(
+      deps(auditIssues({}, { reviewed: [head] }), ["src/TokenVault.sol"]).d,
+      event,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("4 open (C-01, H-01, H-02, H-03)");
   });
 });

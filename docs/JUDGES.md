@@ -17,7 +17,7 @@ About 10 minutes. You need a Jira Cloud site where you're an admin. A free devel
 6. Fill in:
    - Bitbucket workspace: `auditgate-demo`
    - Repository: `vault-v2`
-   - Audited commit: `3f1c2a9e0b7d4c6a8e5f1b2c3d4e5f6a7b8c9d0e`
+   - Audited commit: `16b9a19b8abb41043380cdb80719b67e949b7aa1` (the real commit in the public demo repo, so the source links on each issue open the audited lines)
    - Leave the scope and the toggle as they are.
 7. Click **Create audit and 11 issues**. Within about 20 seconds the page shows all 11 issues, and the gate says **blocked**, because 1 Critical and 3 High findings are open.
 
@@ -53,8 +53,27 @@ This shows what the release gate would say about a pull request, without setting
 
 Upload the same report again under **Re-import the report**. AuditGate reports "Nothing changed since the last import" and creates no duplicates. Edit one finding's title in the file and re-import: only that issue updates.
 
+## 6. The Bitbucket merge check
+
+**See it without setting anything up.** Pull request #1 in the demo repo fixes H-01 and is blocked by AuditGate: <https://bitbucket.org/auditgate-demo/vault-v2/pull-requests/1>. In the right sidebar, click the **AuditGate** check under "Checks". The message reads:
+
+> Blocked by AuditGate: 4 open (C-01, H-01, H-02, H-03), 1 audited file changed without re-review (src/TokenVault.sol). Jira: C-01 KAN-12, H-01 KAN-13, H-02 KAN-14, H-03 KAN-15. Compared with 16b9a19 ("Vault v2 audit").
+
+**Run it yourself.** Install AuditGate for Bitbucket on a shared (team) workspace and follow [`BITBUCKET.md`](BITBUCKET.md), about 15 minutes. In short:
+
+1. Push the demo contracts to a repo and create the audit in Jira with that commit.
+2. In Jira, AuditGate tab, click **Connect Bitbucket** and copy the site ID and signing secret.
+3. In the repo, **Repository settings** > **AuditGate**: paste them with your email and an API token that has only `read:jira-work`, then **Check and save**.
+4. Turn on **Custom merge checks** for the workspace and add the AuditGate check to the repo.
+5. Open a pull request that edits `src/TokenVault.sol`. The check fails and names the blocking findings.
+
+The Bitbucket app reads Jira and never writes to it. It rejects finding data that has been edited by hand, because the Jira app signs it.
+
+**Clear the gate.** In Jira, move C-01 and H-01 to H-03 to **Mark as fixed** (or accept a risk with a reason and an approver). Then, on the audit page, use **Re-review sign-off** with the pull request's head commit (in Bitbucket, the PR's latest commit, all 40 characters) and a note. Those findings become Verified. Push any small commit to the pull request, or click **Merge** to re-run the check: it passes for the signed-off commit and says the changes were signed off in a re-review.
+
 ## Known limitations
 
-- **[Until the Bitbucket app ships]** The Bitbucket merge check that blocks a real pull request is in progress. **Check a change** uses the same drift and gate logic.
-- In Bitbucket, a custom merge check can block a merge only on the Premium plan. On other plans, it shows a failing check.
+- In Bitbucket, a custom merge check can block a merge only on the Premium plan. On Free and Standard it runs and shows a failing check with the full message, but Bitbucket doesn't stop the merge.
+- The check runs on new pushes to a pull request and on merge. A pull request opened from a branch that already existed gets its first result on the next push or merge attempt.
+- Each new commit that touches audited code needs its own re-review sign-off. That is deliberate: a sign-off covers exactly the code someone reviewed.
 - Supported report formats: Markdown in the template at `demo/reports/TEMPLATE.md`, Slither JSON, and Aderyn JSON. No PDF import.

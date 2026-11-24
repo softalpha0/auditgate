@@ -16,7 +16,7 @@ It fails closed: no connection, a bad token, unverifiable data or a missing comm
 
 **Blocking the merge needs Bitbucket Premium.** On Free and Standard the check runs and shows the result, but Bitbucket doesn't stop the merge.
 
-**Known limit:** with "Block on unreviewed changes" on, any change to an audited file blocks until a new audit is imported. There's no re-review sign-off button yet.
+**Clearing the gate:** with "Block on unreviewed changes" on, any change to an audited file blocks until someone signs it off. In Jira, on the audit page, a project admin uses **Re-review sign-off**: they enter the commit they reviewed (normally the head of the pull request) and a note. Findings marked fixed become Verified, and the merge check passes for exactly that commit if no Critical or High finding is still open. The next commit that touches audited code needs a new sign-off.
 
 ## Setup, step by step
 

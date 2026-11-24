@@ -26,6 +26,17 @@ export interface AuditSettings {
 }
 
 /** An audit as stored: the core Audit plus where it lives in Jira and its import state. */
+/** A reviewer confirming every change since the audit, up to one commit. */
+export interface ReviewSignOff {
+  commit: string;
+  /** Atlassian account ID. */
+  by: string;
+  at: string;
+  note: string;
+  /** External ids of the findings this sign-off moved from Fixed to Verified. */
+  verified: string[];
+}
+
 export interface StoredAudit extends Audit {
   projectId: string;
   projectKey: string;
@@ -34,6 +45,8 @@ export interface StoredAudit extends Audit {
   settings: AuditSettings;
   import: ImportStatus;
   lastImport: ImportSummary;
+  /** Re-review sign-offs, oldest first. */
+  reviews?: ReviewSignOff[];
 }
 
 export interface ImportSummary {
@@ -115,6 +128,14 @@ export interface AuditDetail {
   settings: AuditSettings;
   lastImport: ImportSummary;
   findings: FindingRow[];
+  /** Newest first, with display names. */
+  reviews: (ReviewSignOff & { byName: string })[];
+}
+
+export interface SignOffInput {
+  auditId: string;
+  commit: string;
+  note: string;
 }
 
 export interface LocationLink {
@@ -196,4 +217,5 @@ export const RESOLVERS = {
   checkChange: "checkChange",
   bitbucketSetup: "bitbucketSetup",
   signIssues: "signIssues",
+  signOffReview: "signOffReview",
 } as const;

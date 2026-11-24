@@ -15,6 +15,7 @@ import {
   reimport,
   runImport,
   signIssues,
+  signOffReview,
   type Caller,
 } from "../src/backend/service";
 import { makeDeps, TEST_SECRET } from "./fakes";
@@ -473,5 +474,50 @@ describe("signed data for the Bitbucket merge check", () => {
     await expect(bitbucketSetup(deps, caller, { cloudId: "x" })).rejects.toThrow(
       /Only a project admin/,
     );
+  });
+});
+
+describe("re-review sign-off", () => {
+  const REVIEWED = "4ee607f0123456789abcdef0123456789abcdef0";
+
+  it("verifies fixed findings, records the commit and re-signs every issue", async () => {
+    const { deps, jira, jobs, store, auditId } = await importedAudit();
+    const h01 = jira.issues.find((i) => i.property.externalId === "H-01")!;
+    await changeStatus(deps, h01.id, "user-2", { to: "InFix", note: "PR #1" });
+    await changeStatus(deps, h01.id, "user-2", { to: "FixedPendingRecheck", note: "Merged" });
+
+    const detail = await signOffReview(deps, caller, {
+      auditId,
+      commit: REVIEWED.toUpperCase(),
+      note: "PR #1, fix for H-01",
+    });
+    expect(detail.reviews[0]).toMatchObject({
+      commit: REVIEWED,
+      by: "user-1",
+      byName: "Ada Lovelace",
+      verified: ["H-01"],
+    });
+    expect(detail.findings.find((f) => f.externalId === "H-01")?.status).toBe("Verified");
+
+    await runImport(deps, jobs.shift()!);
+    const after = jira.issues.find((i) => i.property.externalId === "H-01")!;
+    expect(after.property).toMatchObject({
+      status: "Verified",
+      audit: { reviewedCommits: [REVIEWED] },
+    });
+    expect(jira.issues.every((i) => verifyProperty(i.property, TEST_SECRET))).toBe(true);
+    const audit = await store.getAudit("10000", auditId);
+    expect(audit?.import.state).toBe("done");
+  });
+
+  it("needs a full commit hash, a note and a project admin", async () => {
+    const { deps, auditId, admin } = await importedAudit();
+    await expect(
+      signOffReview(deps, caller, { auditId, commit: "4ee607f", note: "" }),
+    ).rejects.toThrow(/full 40-character commit.*Say what you reviewed/);
+    admin.value = false;
+    await expect(
+      signOffReview(deps, caller, { auditId, commit: REVIEWED, note: "PR #1" }),
+    ).rejects.toThrow(/Only a project admin/);
   });
 });

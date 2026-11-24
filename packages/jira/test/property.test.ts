@@ -2,7 +2,13 @@ import type { Finding } from "@auditgate/core";
 import { parseReport, toNewFindings } from "@auditgate/parsers";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { canonicalJson, issueProperty, signProperty, verifyProperty } from "../src/property.js";
+import {
+  canonicalJson,
+  isReviewedCommit,
+  issueProperty,
+  signProperty,
+  verifyProperty,
+} from "../src/property.js";
 
 const md = readFileSync(
   new URL("../../../demo/reports/vault-v2-audit.md", import.meta.url),
@@ -68,5 +74,30 @@ describe("issue property signing", () => {
     expect(canonicalJson({ b: 1, a: { d: [2, { y: 1, x: 2 }], c: null } })).toBe(
       '{"a":{"c":null,"d":[2,{"x":2,"y":1}]},"b":1}',
     );
+  });
+
+  it("carries the newest signed-off commits, lowercase, and signs them", () => {
+    const reviews = Array.from({ length: 25 }, (_, i) => ({
+      commit: `${String(i).padStart(2, "0")}${"A".repeat(38)}`,
+    }));
+    const p = issueProperty(byId("C-01"), { ...audit, reviews });
+    expect(p.audit.reviewedCommits).toHaveLength(20);
+    expect(p.audit.reviewedCommits[19]).toBe(`24${"a".repeat(38)}`);
+    const signed = signProperty(p, SECRET);
+    expect(
+      verifyProperty(
+        { ...signed, audit: { ...signed.audit, reviewedCommits: ["f".repeat(40)] } },
+        SECRET,
+      ),
+    ).toBe(false);
+  });
+
+  it("matches a reviewed commit by full hash or a 12-character prefix, never shorter", () => {
+    const sha = "4ee607f0123456789abcdef0123456789abcdef0";
+    expect(isReviewedCommit([sha], sha)).toBe(true);
+    expect(isReviewedCommit([sha], "4EE607F01234")).toBe(true);
+    expect(isReviewedCommit([sha], "4ee607f")).toBe(false);
+    expect(isReviewedCommit([sha], "5ee607f01234")).toBe(false);
+    expect(isReviewedCommit([], sha)).toBe(false);
   });
 });

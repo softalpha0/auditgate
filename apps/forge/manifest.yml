@@ -76,6 +76,20 @@ modules:
         - list-open-findings
         - get-finding
         - check-drift
+      skills:
+        - auditgate-release-check
+
+  # Instructions an agent loads when a question is about release readiness or audit findings.
+  rovo:skill:
+    - key: auditgate-release-check
+      source:
+        dir: skills/auditgate-release-check
+      dependencies:
+        tools:
+          - release-readiness
+          - list-open-findings
+          - get-finding
+          - check-drift
 
   action:
     - key: release-readiness

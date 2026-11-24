@@ -20,6 +20,8 @@ export interface PropertyAudit {
   auditedFiles: string[];
   blockOnUnreviewedChanges: boolean;
   createdAt: string;
+  /** Commits where someone signed off a re-review of every change since the audit. */
+  reviewedCommits: string[];
 }
 
 /**
@@ -49,7 +51,13 @@ export interface IssueProperty {
 export type PropertyAuditSource = Pick<
   Audit,
   "id" | "name" | "repo" | "auditedCommit" | "auditedFiles" | "createdAt"
-> & { settings?: { blockOnUnreviewedChanges: boolean } };
+> & {
+  settings?: { blockOnUnreviewedChanges: boolean };
+  reviews?: { commit: string }[];
+};
+
+/** Only the newest sign-offs travel on issues; older commits are long merged. */
+const MAX_REVIEWED_COMMITS = 20;
 
 /** Above this many audited files, only the files with findings are copied onto issues. */
 const MAX_AUDITED_FILES = 300;
@@ -84,6 +92,9 @@ export function issueProperty(finding: Finding, audit: PropertyAuditSource): Iss
       auditedFiles: audit.auditedFiles.slice(0, MAX_AUDITED_FILES),
       blockOnUnreviewedChanges: audit.settings?.blockOnUnreviewedChanges ?? true,
       createdAt: audit.createdAt,
+      reviewedCommits: (audit.reviews ?? [])
+        .slice(-MAX_REVIEWED_COMMITS)
+        .map((r) => r.commit.toLowerCase()),
     },
   };
 }
@@ -104,6 +115,16 @@ function signatureOf(property: IssueProperty, secret: string): string {
   const unsigned: Partial<IssueProperty> = { ...property };
   delete unsigned.sig;
   return createHmac("sha256", secret).update(canonicalJson(unsigned)).digest("hex");
+}
+
+/**
+ * True when one of the signed-off commits is the commit being checked. Bitbucket often reports
+ * abbreviated hashes, so a prefix of at least 12 characters counts.
+ */
+export function isReviewedCommit(reviewed: readonly string[], commit: string): boolean {
+  const c = commit.trim().toLowerCase();
+  if (c.length < 12) return false;
+  return reviewed.some((r) => r.startsWith(c) || (r.length >= 12 && c.startsWith(r)));
 }
 
 export function signProperty(property: IssueProperty, secret: string): IssueProperty {

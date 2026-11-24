@@ -16,7 +16,11 @@ export interface GateOptions {
    * finding is affected. Cleared by a re-review sign-off at the commit being checked.
    */
   blockOnUnreviewedChanges?: boolean;
-  /** True when someone signed off a re-review at exactly the commit being checked. */
+  /**
+   * True when someone signed off a re-review at exactly the commit being checked. The sign-off
+   * covers every change up to that commit: changed audited files don't block, and verified or
+   * accepted findings in them don't count as drifted. Open findings still block.
+   */
   changesReviewed?: boolean;
   /** How many keys to list per group before "+N more". */
   maxKeysPerGroup?: number;
@@ -78,7 +82,9 @@ export function evaluateGate(
   options: GateOptions = {},
 ): GateResult {
   const max = options.maxKeysPerGroup ?? 8;
-  const drifted = new Set(drift?.driftedFindings.map((d) => d.id) ?? []);
+  const drifted = new Set(
+    options.changesReviewed ? [] : (drift?.driftedFindings.map((d) => d.id) ?? []),
+  );
   const gating = findings
     .filter((f) => isGatingSeverity(f.severity))
     .sort(

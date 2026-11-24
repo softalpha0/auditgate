@@ -132,4 +132,32 @@ describe("evaluateGate", () => {
       ).toBe(true);
     });
   });
+
+  it("a re-review sign-off at the checked commit clears drift but not open findings", () => {
+    const findings = [
+      { id: "a", externalId: "H-01", severity: "High", status: "Verified" },
+      { id: "b", externalId: "H-02", severity: "High", status: "AcceptedRisk" },
+    ] as const;
+    const drift = {
+      changedFiles: [{ path: "src/TokenVault.sol", status: "modified" as const }],
+      outOfScopeFiles: [],
+      driftedFindings: [
+        { id: "a", externalId: "H-01", files: ["src/TokenVault.sol"] },
+        { id: "b", externalId: "H-02", files: ["src/TokenVault.sol"] },
+      ],
+    };
+    const blocked = evaluateGate([...findings], drift, { blockOnUnreviewedChanges: true });
+    expect(blocked.blocking).toEqual(["H-01", "H-02"]);
+    const reviewed = evaluateGate([...findings], drift, {
+      blockOnUnreviewedChanges: true,
+      changesReviewed: true,
+    });
+    expect(reviewed).toMatchObject({ pass: true, blocking: [], unreviewedFiles: [] });
+    const stillOpen = evaluateGate(
+      [...findings, { id: "c", externalId: "C-01", severity: "Critical", status: "Open" }],
+      drift,
+      { blockOnUnreviewedChanges: true, changesReviewed: true },
+    );
+    expect(stillOpen).toMatchObject({ pass: false, blocking: ["C-01"] });
+  });
 });

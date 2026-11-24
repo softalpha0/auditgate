@@ -1,7 +1,7 @@
 import { compareSeverity } from "@auditgate/core";
 import { computeDrift, fromBitbucketDiffstat, type BitbucketDiffstatEntry } from "@auditgate/drift";
 import { evaluateGate } from "@auditgate/gate";
-import { verifyProperty, type IssueProperty } from "@auditgate/jira";
+import { isReviewedCommit, verifyProperty, type IssueProperty } from "@auditgate/jira";
 
 /**
  * The AuditGate merge check. Reads the repository's findings from Jira, checks they were signed by
@@ -167,6 +167,8 @@ export async function runMergeCheck(
     })),
     changes: fromBitbucketDiffstat(entries),
   });
+  // Data signed before sign-offs existed has no reviewedCommits; that means none.
+  const reviewed = isReviewedCommit(audit.reviewedCommits ?? [], head);
   const gate = evaluateGate(
     findings.map((f) => ({
       id: f.p.findingId,
@@ -175,13 +177,16 @@ export async function runMergeCheck(
       status: f.p.status,
     })),
     drift,
-    { blockOnUnreviewedChanges: audit.blockOnUnreviewedChanges },
+    { blockOnUnreviewedChanges: audit.blockOnUnreviewedChanges, changesReviewed: reviewed },
   );
 
   const keyOf = new Map(findings.map((f) => [f.p.externalId, f.key]));
   const parts = [gate.message];
   if (gate.blocking.length) {
     parts.push(`Jira: ${list(gate.blocking.map((id) => `${id} ${keyOf.get(id) ?? ""}`.trim()))}.`);
+  }
+  if (reviewed && drift.changedFiles.length) {
+    parts.push(`Changes up to ${head.slice(0, 7)} were signed off in a re-review.`);
   }
   parts.push(`Compared with ${audit.auditedCommit.slice(0, 7)} ("${audit.name}").`);
   return { success: gate.pass, message: parts.join(" ") };
