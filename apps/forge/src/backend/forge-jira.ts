@@ -1,5 +1,6 @@
 import api, { route } from "@forge/api";
 import {
+  DRIFT_PROPERTY_KEY,
   ISSUE_PROPERTY_KEY,
   pickIssueTypeId,
   type CreateContext,
@@ -166,6 +167,18 @@ export const forgeJira: Jira = {
         body: JSON.stringify(value),
       });
     await expectOk(res, `save AuditGate data on ${issueKey}`);
+  },
+
+  async getDriftRecord(issueId) {
+    const res = await api
+      .asApp()
+      .requestJira(route`/rest/api/3/issue/${issueId}/properties/${DRIFT_PROPERTY_KEY}`, {
+        headers: { Accept: "application/json" },
+      });
+    if (res.status === 404) return undefined;
+    await expectOk(res, "read the drift recorded on this issue");
+    const body = (await res.json()) as { value?: unknown };
+    return body.value;
   },
 
   async findAuditIssues(auditId) {

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Finding, FindingStatus } from "@auditgate/core";
-import { issueProperty, signProperty } from "@auditgate/jira";
+import { issueProperty, signProperty, verifyDrift, type DriftProperty } from "@auditgate/jira";
 import { parseReport, toNewFindings } from "@auditgate/parsers";
 import { describe, expect, it } from "vitest";
 import {
@@ -10,6 +10,7 @@ import {
   type FindingIssue,
   type JiraConfig,
   type MergeCheckEvent,
+  type WriteBackStatus,
 } from "../src/backend/check";
 
 const md = readFileSync(
@@ -63,7 +64,12 @@ function deps(
   changed: string[] = ["README.md"],
   overrides: Partial<CheckDeps> = {},
 ) {
-  const calls = { diffstat: [] as string[][], repo: [] as string[] };
+  const calls = {
+    diffstat: [] as string[][],
+    repo: [] as string[],
+    drift: [] as { key: string; record: DriftProperty }[],
+    status: [] as WriteBackStatus[],
+  };
   const d: CheckDeps = {
     config: async (uuid) => (uuid === "repo-uuid" ? config : undefined),
     bitbucket: {
@@ -79,7 +85,14 @@ function deps(
         calls.repo.push(repo);
         return issues;
       },
+      recordDrift: async (_config, key, record) => {
+        calls.drift.push({ key, record });
+      },
     },
+    saveWriteBack: async (_uuid, status) => {
+      calls.status.push(status);
+    },
+    now: () => new Date("2026-11-24T21:00:00.000Z"),
     ...overrides,
   };
   return { d, calls };
@@ -210,5 +223,86 @@ describe("merge check", () => {
     );
     expect(result.success).toBe(false);
     expect(result.message).toContain("4 open (C-01, H-01, H-02, H-03)");
+  });
+
+  describe("recording drift in Jira", () => {
+    const writing = { ...config, writeBack: true };
+    const withWriteBack = (issues: FindingIssue[], changed: string[]) =>
+      deps(issues, changed, { config: async () => writing });
+
+    it("writes nothing unless the admin turned it on", async () => {
+      const { d, calls } = deps(auditIssues(), ["src/TokenVault.sol"]);
+      await runMergeCheck(d, event);
+      expect(calls.drift).toEqual([]);
+      expect(calls.status).toEqual([]);
+    });
+
+    it("saves a signed record on each drifted finding's issue, and the verdict is unchanged", async () => {
+      const issues = auditIssues();
+      const plain = await runMergeCheck(deps(issues, ["src/TokenVault.sol"]).d, event);
+      const { d, calls } = withWriteBack(issues, ["src/TokenVault.sol"]);
+      const result = await runMergeCheck(d, event);
+      expect(result).toEqual(plain);
+
+      expect(calls.drift.length).toBeGreaterThan(0);
+      for (const { record } of calls.drift) {
+        expect(verifyDrift(record, SECRET)).toBe(true);
+        expect(record).toMatchObject({
+          kind: "drift",
+          auditId: "a1",
+          repo: "auditgate-demo/vault-v2",
+          prId: 7,
+          commit: HEAD,
+          files: ["src/TokenVault.sol"],
+          checkedAt: "2026-11-24T21:00:00.000Z",
+        });
+      }
+      const h02 = calls.drift.find((c) => c.record.externalId === "H-02");
+      expect(h02?.key).toBe(keyOf(issues, "H-02"));
+      expect(calls.status).toEqual([
+        expect.objectContaining({
+          prId: 7,
+          written: calls.drift.map((c) => c.key),
+          failed: [],
+        }),
+      ]);
+    });
+
+    it("rejects a tampered record", async () => {
+      const { d, calls } = withWriteBack(auditIssues(), ["src/TokenVault.sol"]);
+      await runMergeCheck(d, event);
+      const record = { ...calls.drift[0]!.record, prId: 99 };
+      expect(verifyDrift(record, SECRET)).toBe(false);
+      expect(verifyDrift(calls.drift[0]!.record, "cd".repeat(32))).toBe(false);
+    });
+
+    it("keeps the verdict when Jira refuses the write, and says why on the settings page", async () => {
+      const issues = auditIssues();
+      const { d, calls } = withWriteBack(issues, ["src/TokenVault.sol"]);
+      d.jira.recordDrift = async () => {
+        throw new Error("Jira didn't let the saved API token write to issues.");
+      };
+      const result = await runMergeCheck(d, event);
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("4 open");
+      expect(calls.status[0]?.written).toEqual([]);
+      expect(calls.status[0]?.failed.length).toBeGreaterThan(0);
+      expect(calls.status[0]?.error).toMatch(/write to issues/);
+    });
+
+    it("records nothing at a signed-off commit", async () => {
+      const head = `${HEAD}0123456789abcdef0123456789`;
+      const { d, calls } = withWriteBack(auditIssues({}, { reviewed: [head] }), [
+        "src/TokenVault.sol",
+      ]);
+      await runMergeCheck(d, event);
+      expect(calls.drift).toEqual([]);
+    });
+
+    it("records nothing when no finding's code changed", async () => {
+      const { d, calls } = withWriteBack(auditIssues(), ["README.md"]);
+      await runMergeCheck(d, event);
+      expect(calls.drift).toEqual([]);
+    });
   });
 });

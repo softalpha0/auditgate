@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import ForgeReconciler, {
   Box,
   Button,
+  Checkbox,
   Code,
   ErrorMessage,
   Heading,
@@ -29,7 +30,13 @@ const card = xcss({
   borderRadius: "radius.medium",
 });
 
-const empty: SaveSettingsInput = { cloudId: "", email: "", token: "", signingSecret: "" };
+const empty: SaveSettingsInput = {
+  cloudId: "",
+  email: "",
+  token: "",
+  signingSecret: "",
+  writeBack: false,
+};
 
 const Settings = () => {
   const [status, setStatus] = useState<SettingsStatus>();
@@ -43,14 +50,21 @@ const Settings = () => {
     call<SettingsStatus>(RESOLVERS.getSettings).then((r) => {
       if (!r.ok) return setLoadError(r.error);
       setStatus(r.data);
-      setForm({ ...empty, cloudId: r.data.cloudId ?? "", email: r.data.email ?? "" });
+      setForm({
+        ...empty,
+        cloudId: r.data.cloudId ?? "",
+        email: r.data.email ?? "",
+        writeBack: r.data.writeBack ?? false,
+      });
     });
   useEffect(() => {
     void load();
   }, []);
 
-  const set = (key: keyof SaveSettingsInput) => (e: { target: { value?: unknown } }) =>
-    setForm((f) => ({ ...f, [key]: String(e.target.value ?? "") }));
+  const set =
+    (key: "cloudId" | "email" | "token" | "signingSecret") =>
+    (e: { target: { value?: unknown } }) =>
+      setForm((f) => ({ ...f, [key]: String(e.target.value ?? "") }));
 
   const save = async () => {
     setSaving(true);
@@ -89,7 +103,8 @@ const Settings = () => {
         <Text>
           Blocks pull requests into {status.repo} while a Critical or High audit finding is open in
           Jira, or while they change audited code that nobody has re-reviewed. Findings are read
-          from Jira with the account below. Nothing in Jira is changed.
+          from Jira with the account below. Nothing in Jira is changed unless you turn on recording
+          drift.
         </Text>
       </Stack>
 
@@ -98,6 +113,11 @@ const Settings = () => {
           <Text>
             Reading findings as {status.email} from site <Code>{status.cloudId ?? ""}</Code>.
           </Text>
+          <Text>
+            {status.writeBack
+              ? "Recording drift on Jira issues: on."
+              : "Recording drift on Jira issues: off."}
+          </Text>
         </SectionMessage>
       ) : (
         <SectionMessage appearance="warning" title="Not connected yet">
@@ -105,6 +125,25 @@ const Settings = () => {
             Until this is set up, the merge check fails on every pull request, so nothing merges
             unchecked.
           </Text>
+        </SectionMessage>
+      )}
+
+      {status.writeBack && status.lastWriteBack && (
+        <SectionMessage
+          appearance={status.lastWriteBack.failed.length ? "warning" : "information"}
+          title="Last drift recorded in Jira"
+        >
+          <Text>
+            {`Pull request #${status.lastWriteBack.prId} at ${status.lastWriteBack.commit.slice(0, 7)}, ${status.lastWriteBack.at.slice(0, 16).replace("T", " ")} UTC.`}
+          </Text>
+          {status.lastWriteBack.written.length > 0 && (
+            <Text>{`Saved on ${status.lastWriteBack.written.join(", ")}.`}</Text>
+          )}
+          {status.lastWriteBack.failed.length > 0 && (
+            <Text>
+              {`Not saved on ${status.lastWriteBack.failed.join(", ")}: ${status.lastWriteBack.error ?? "Jira refused."} The merge check result isn't affected.`}
+            </Text>
+          )}
         </SectionMessage>
       )}
 
@@ -136,11 +175,26 @@ const Settings = () => {
             <Label labelFor="token">API token</Label>
             <Textfield id="token" type="password" value={form.token} onChange={set("token")} />
             <HelperMessage>
-              {`Create a token with the scope read:jira-work only. ${keep ?? ""}`.trim()}
+              {`Create a token with the scope read:jira-work${form.writeBack ? " and write:jira-work" : " only"}. ${keep ?? ""}`.trim()}
             </HelperMessage>
             <Link href="https://id.atlassian.com/manage-profile/security/api-tokens" openNewTab>
               Create an API token
             </Link>
+          </Stack>
+          <Stack space="space.050">
+            <Checkbox
+              name="writeBack"
+              label="Record drift on Jira issues"
+              isChecked={form.writeBack === true}
+              onChange={(e: { target: { checked?: boolean } }) =>
+                setForm((f) => ({ ...f, writeBack: e.target.checked === true }))
+              }
+            />
+            <HelperMessage>
+              When a pull request changes audited code, AuditGate marks the affected findings in
+              Jira with the pull request and commit. The token then also needs write:jira-work.
+              Leave it off to keep the token read-only; the merge check works the same either way.
+            </HelperMessage>
           </Stack>
           {error && <ErrorMessage>{error}</ErrorMessage>}
           {saved && (

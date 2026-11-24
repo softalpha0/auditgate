@@ -141,6 +141,29 @@ const App = () => {
         </SectionMessage>
       ) : null}
 
+      {view.drift ? (
+        <SectionMessage
+          appearance={view.drift.signedOff ? "information" : "warning"}
+          title={
+            view.drift.signedOff
+              ? "Pull request change signed off"
+              : "A pull request changed this finding's code"
+          }
+        >
+          <Text>
+            {`Bitbucket pull request #${view.drift.prId} changed ${view.drift.files.join(", ")} at commit ${view.drift.commit.slice(0, 7)}, after the audit. Seen by the merge check on ${view.drift.checkedAt.slice(0, 10)}.`}
+          </Text>
+          <Text>
+            {view.drift.signedOff
+              ? "That commit was signed off in a re-review."
+              : "Nobody has re-reviewed that change yet. Sign it off on the audit page after a review."}
+          </Text>
+          <Link href={view.drift.prUrl} openNewTab>
+            Open the pull request
+          </Link>
+        </SectionMessage>
+      ) : null}
+
       <Stack space="space.050">
         <Text weight="semibold">{finding.locations.length > 1 ? "Locations" : "Location"}</Text>
         {finding.locations.length ? (

@@ -1,7 +1,7 @@
 import api, { assumeTrustedRoute, route } from "@forge/api";
 import { kvs } from "@forge/kvs";
 import type { BitbucketDiffstatEntry } from "@auditgate/drift";
-import { ISSUE_PROPERTY_KEY } from "@auditgate/jira";
+import { DRIFT_PROPERTY_KEY, ISSUE_PROPERTY_KEY } from "@auditgate/jira";
 import {
   CheckError,
   NotFound,
@@ -9,9 +9,19 @@ import {
   type FindingIssue,
   type Jira,
   type JiraConfig,
+  type WriteBackStatus,
 } from "./check";
 
 const configKey = (repoUuid: string) => `jira-config:${repoUuid}`;
+const writeBackKey = (repoUuid: string) => `write-back:${repoUuid}`;
+
+export async function loadWriteBack(repoUuid: string): Promise<WriteBackStatus | undefined> {
+  return kvs.get<WriteBackStatus>(writeBackKey(repoUuid));
+}
+
+export async function saveWriteBack(repoUuid: string, status: WriteBackStatus): Promise<void> {
+  await kvs.set(writeBackKey(repoUuid), status);
+}
 
 export async function loadConfig(repoUuid: string): Promise<JiraConfig | undefined> {
   return kvs.getSecret<JiraConfig>(configKey(repoUuid));
@@ -23,6 +33,7 @@ export async function saveConfig(repoUuid: string, config: JiraConfig): Promise<
 
 export async function deleteConfig(repoUuid: string): Promise<void> {
   await kvs.deleteSecret(configKey(repoUuid));
+  await kvs.delete(writeBackKey(repoUuid));
 }
 
 async function bitbucketJson<T>(path: ReturnType<typeof route>, what: string): Promise<T> {
@@ -133,5 +144,26 @@ export const forgeJira: Jira = {
       nextPageToken = page.nextPageToken;
     } while (nextPageToken);
     return found;
+  },
+
+  async recordDrift(config, issueKey, record) {
+    if (!/^[A-Z][A-Z0-9_]*-\d+$/.test(issueKey)) {
+      throw new CheckError(`"${issueKey}" isn't a Jira issue key.`);
+    }
+    const res = await api.fetch(
+      `${jiraBase(config)}/rest/api/3/issue/${issueKey}/properties/${DRIFT_PROPERTY_KEY}`,
+      {
+        method: "PUT",
+        headers: { Authorization: basicAuth(config), "Content-Type": "application/json" },
+        body: JSON.stringify(record),
+      },
+    );
+    if (res.status === 401 || res.status === 403) {
+      throw new CheckError(
+        "Jira didn't let the saved API token write to issues. Give it the write:jira-work scope, or turn off recording drift.",
+      );
+    }
+    if (!res.ok)
+      throw new CheckError(`Jira didn't save the drift on ${issueKey} (HTTP ${res.status}).`);
   },
 };

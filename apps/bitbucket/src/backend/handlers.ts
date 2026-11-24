@@ -7,7 +7,15 @@ import type {
 } from "../shared/contract";
 import { RESOLVERS } from "../shared/contract";
 import { CheckError, runMergeCheck, type MergeCheckEvent } from "./check";
-import { deleteConfig, forgeBitbucket, forgeJira, loadConfig, saveConfig } from "./forge";
+import {
+  deleteConfig,
+  forgeBitbucket,
+  forgeJira,
+  loadConfig,
+  loadWriteBack,
+  saveConfig,
+  saveWriteBack,
+} from "./forge";
 import {
   SettingsError,
   disconnect,
@@ -23,7 +31,7 @@ import {
 export async function mergeCheck(event: MergeCheckEvent) {
   try {
     return await runMergeCheck(
-      { config: loadConfig, bitbucket: forgeBitbucket, jira: forgeJira },
+      { config: loadConfig, bitbucket: forgeBitbucket, jira: forgeJira, saveWriteBack },
       event,
     );
   } catch (error) {
@@ -43,6 +51,7 @@ const settingsDeps: SettingsDeps = {
   load: loadConfig,
   save: saveConfig,
   remove: deleteConfig,
+  lastWriteBack: loadWriteBack,
   jira: forgeJira,
 };
 

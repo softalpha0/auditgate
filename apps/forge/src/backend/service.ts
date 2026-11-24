@@ -13,11 +13,13 @@ import {
   bitbucketSourceUrl,
   contentHash,
   createIssueBody,
+  isReviewedCommit,
   locationLabel,
   mergeImport,
   needsSync,
   pickPriorityId,
   updateIssueFields,
+  verifyDrift,
   type CreateContext,
   type StoredFinding,
 } from "@auditgate/jira";
@@ -737,9 +739,47 @@ function panelView(audit: StoredAudit, finding: StoredFinding): PanelView {
   return view;
 }
 
+/**
+ * Adds what the Bitbucket merge check last recorded on this issue. Only a record signed with this
+ * site's secret, for this audit and finding, counts; anything else is ignored, not shown.
+ */
+async function withDrift(
+  deps: Deps,
+  issueId: string,
+  audit: StoredAudit,
+  finding: StoredFinding,
+  view: PanelView,
+): Promise<PanelView> {
+  let record: unknown;
+  try {
+    record = await deps.jira.getDriftRecord(issueId);
+  } catch {
+    return view; // The panel still works without it.
+  }
+  if (!record) return view;
+  const secret = await deps.secrets.signingSecret();
+  if (!verifyDrift(record, secret)) return view;
+  if (record.auditId !== audit.id || record.findingId !== finding.id) return view;
+  const repo = `${audit.repo.workspace}/${audit.repo.slug}`.toLowerCase();
+  const reviewed = (audit.reviews ?? []).map((r) => r.commit.toLowerCase());
+  return {
+    ...view,
+    drift: {
+      prId: record.prId,
+      prUrl: `https://bitbucket.org/${repo}/pull-requests/${record.prId}`,
+      commit: record.commit,
+      files: record.files,
+      checkedAt: record.checkedAt,
+      signedOff: isReviewedCommit(reviewed, record.commit),
+    },
+  };
+}
+
 export async function getPanel(deps: Deps, issueId: string): Promise<PanelView | null> {
   const loaded = await loadForIssue(deps, issueId);
-  return loaded ? panelView(loaded.audit, loaded.finding) : null;
+  if (!loaded) return null;
+  const { audit, finding } = loaded;
+  return withDrift(deps, issueId, audit, finding, panelView(audit, finding));
 }
 
 export async function changeStatus(
@@ -779,7 +819,7 @@ export async function changeStatus(
       createIssueBody(next, audit, ctx, await deps.secrets.signingSecret()).properties[0]!.value,
     );
   }
-  return panelView(audit, next);
+  return withDrift(deps, issueId, audit, next, panelView(audit, next));
 }
 
 /**

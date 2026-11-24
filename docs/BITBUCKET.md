@@ -6,13 +6,15 @@ The merge check is a second Forge app, in `apps/bitbucket`. One Forge app can't 
 
 1. A pull request gets a new commit, or someone clicks Merge.
 2. Bitbucket runs the AuditGate check.
-3. The check reads the repository's findings from Jira over the Jira REST API, using an API token a repository admin saved. The token only needs `read:jira-work`. Nothing in Jira is changed.
+3. The check reads the repository's findings from Jira over the Jira REST API, using an API token a repository admin saved. The token only needs `read:jira-work`. By default nothing in Jira is changed.
 4. It keeps only findings whose AuditGate data carries a valid signature from the Jira app. If any finding fails the check, the merge check fails. Editing an issue property by hand can't open the gate.
 5. It asks Bitbucket which files changed between the audited commit and the pull request, then runs the same gate as "Check a change" in Jira.
 6. The pull request shows pass or fail with a message, for example:
    `Blocked by AuditGate: 4 open (C-01, H-01, H-02, H-03). Jira: C-01 KAN-12, ... Compared with 1a2b3c4 ("Vault v2 audit").`
 
 It fails closed: no connection, a bad token, unverifiable data or a missing commit all fail the check, with a message that says what to fix.
+
+**Optional: record drift in Jira.** Tick **Record drift on Jira issues** on the settings page, and give the token `write:jira-work` as well. When a pull request changes code a finding points at, the check saves a signed `auditgate-drift` property on that finding's issue: the pull request, the commit, the changed files and the time. The AuditGate panel on the issue shows it, and JQL can find it: `auditgateDriftPr IS NOT EMPTY ORDER BY auditgateDriftAt DESC`. Writing is best effort. If Jira refuses, the merge check result is the same, and the settings page says what went wrong. Nothing is recorded for a commit that was signed off in a re-review.
 
 **Blocking the merge needs Bitbucket Premium.** On Free and Standard the check runs and shows the result, but Bitbucket doesn't stop the merge.
 

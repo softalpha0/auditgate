@@ -6,6 +6,17 @@ export interface SettingsStatus {
   connected: boolean;
   cloudId?: string;
   email?: string;
+  /** Whether the check records drift on the Jira issues. */
+  writeBack?: boolean;
+  /** How the last write-back went, if there was one. */
+  lastWriteBack?: {
+    at: string;
+    prId: number;
+    commit: string;
+    written: string[];
+    failed: string[];
+    error?: string;
+  };
 }
 
 export interface SaveSettingsInput {
@@ -15,6 +26,8 @@ export interface SaveSettingsInput {
   token: string;
   /** Leave empty to keep the secret already saved. */
   signingSecret: string;
+  /** Record drift on the Jira issues. Needs a token with write:jira-work too. */
+  writeBack?: boolean;
 }
 
 export interface SaveSettingsResult {

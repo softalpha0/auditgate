@@ -134,6 +134,13 @@ export class FakeJira implements Jira {
     issue.property = clone(value);
   }
 
+  /** Drift records by issue ID, as the Bitbucket merge check would save them. */
+  driftRecords: Record<string, unknown> = {};
+
+  async getDriftRecord(issueId: string) {
+    return clone(this.driftRecords[issueId]);
+  }
+
   /** Assignee display names by issue key; unassigned when missing. */
   assignees: Record<string, string> = {};
   users: Record<string, string> = { "user-1": "Ada Lovelace", "user-2": "Grace Hopper" };

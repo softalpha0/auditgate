@@ -1,6 +1,13 @@
 import { verifyProperty, type IssueProperty } from "@auditgate/jira";
 import type { SaveSettingsInput, SaveSettingsResult, SettingsStatus } from "../shared/contract";
-import { CheckError, unwrapUuid, type Bitbucket, type Jira, type JiraConfig } from "./check";
+import {
+  CheckError,
+  unwrapUuid,
+  type Bitbucket,
+  type Jira,
+  type JiraConfig,
+  type WriteBackStatus,
+} from "./check";
 
 /** A problem the admin can fix, shown on the settings page as is. */
 export class SettingsError extends Error {
@@ -11,6 +18,7 @@ export interface SettingsDeps {
   load(repoUuid: string): Promise<JiraConfig | undefined>;
   save(repoUuid: string, config: JiraConfig): Promise<void>;
   remove(repoUuid: string): Promise<void>;
+  lastWriteBack?(repoUuid: string): Promise<WriteBackStatus | undefined>;
   jira: Jira;
 }
 
@@ -64,9 +72,17 @@ export async function resolveWhere(
 
 export async function getSettings(deps: SettingsDeps, where: Where): Promise<SettingsStatus> {
   const config = await deps.load(where.repoUuid);
-  return config
-    ? { repo: where.repo, connected: true, cloudId: config.cloudId, email: config.email }
-    : { repo: where.repo, connected: false };
+  if (!config) return { repo: where.repo, connected: false };
+  const status: SettingsStatus = {
+    repo: where.repo,
+    connected: true,
+    cloudId: config.cloudId,
+    email: config.email,
+    writeBack: config.writeBack === true,
+  };
+  const last = config.writeBack ? await deps.lastWriteBack?.(where.repoUuid) : undefined;
+  if (last) status.lastWriteBack = last;
+  return status;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -87,6 +103,7 @@ export async function saveSettings(
     email: input.email.trim(),
     token: input.token.trim() || existing?.token || "",
     signingSecret: input.signingSecret.trim() || existing?.signingSecret || "",
+    writeBack: input.writeBack === true,
   };
   const problems: string[] = [];
   if (!UUID.test(config.cloudId)) {

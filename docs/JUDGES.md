@@ -67,7 +67,7 @@ Upload the same report again under **Re-import the report**. AuditGate reports "
 4. Turn on **Custom merge checks** for the workspace and add the AuditGate check to the repo.
 5. Open a pull request that edits `src/TokenVault.sol`. The check fails and names the blocking findings.
 
-The Bitbucket app reads Jira and never writes to it. It rejects finding data that has been edited by hand, because the Jira app signs it.
+By default the Bitbucket app reads Jira and never writes to it. To see drift recorded on the issues, tick **Record drift on Jira issues** in the settings and use a token that also has `write:jira-work`; after the next push to the pull request, open KAN-14 and the AuditGate panel shows the pull request and commit. It rejects finding data that has been edited by hand, because the Jira app signs it.
 
 **Clear the gate.** In Jira, move C-01 and H-01 to H-03 to **Mark as fixed** (or accept a risk with a reason and an approver). Then, on the audit page, use **Re-review sign-off** with the pull request's head commit (in Bitbucket, the PR's latest commit, all 40 characters) and a note. Those findings become Verified. Push any small commit to the pull request, or click **Merge** to re-run the check: it passes for the signed-off commit and says the changes were signed off in a re-review.
 

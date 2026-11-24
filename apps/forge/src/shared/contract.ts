@@ -159,6 +159,16 @@ export interface PanelView {
   audit: { id: string; name: string; auditor: string; auditedCommit: string; repo: string };
   /** Status changes a person can make from the panel. Drift and verification are automatic. */
   allowedTransitions: FindingStatus[];
+  /** Set when the Bitbucket merge check recorded that a pull request changed this finding's code. */
+  drift?: {
+    prId: number;
+    prUrl: string;
+    commit: string;
+    files: string[];
+    checkedAt: string;
+    /** True when that commit was later signed off in a re-review. */
+    signedOff: boolean;
+  };
 }
 
 export interface ChangeStatusInput {

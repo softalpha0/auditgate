@@ -127,3 +127,7 @@ Using the Atlassian MCP connector on softalpha-dev: all 11 imported issues had M
 ### 17 Nov: the Bitbucket merge check
 
 Built `apps/bitbucket` (merge check plus a repository settings page) and the Jira side it needs: signed issue data, a `repo` index and the Connect Bitbucket page. Design in `ARCHITECTURE.md` section 2b, setup in `BITBUCKET.md`. 194 tests pass. Both manifests and bundles pass the offline Forge check. Not yet run on a real Bitbucket workspace.
+
+### 24 Nov: re-review sign-off, Rovo skill, drift recorded in Jira
+
+Re-review sign-off, the `auditgate-release-check` Rovo skill and the Marketplace pack were deployed (Jira app and Bitbucket app 2.2.0). Then optional drift write-back: with "Record drift on Jira issues" on and a token that can write, the merge check saves a signed `auditgate-drift` property on each drifted finding's issue. The Jira issue panel shows it only when the signature, audit and finding match, and JQL can search it (`auditgateDriftPr`, `auditgateDriftCommit`, `auditgateDriftAt`). The merge check's verdict never depends on the write. 211 tests pass.

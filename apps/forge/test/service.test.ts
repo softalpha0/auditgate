@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { verifyProperty } from "@auditgate/jira";
+import { signDrift, verifyProperty, type DriftProperty } from "@auditgate/jira";
 import { describe, expect, it } from "vitest";
 import type { CreateAuditInput } from "../src/shared/contract";
 import {
@@ -310,6 +310,42 @@ describe("issue panel", () => {
     });
     expect(view?.allowedTransitions).toEqual(["InFix", "AcceptedRisk"]);
     expect(await getPanel(deps, "99999")).toBeNull();
+  });
+
+  it("shows drift the Bitbucket merge check recorded, only when the record is signed", async () => {
+    const { deps, jira } = await importedAudit();
+    const issue = jira.issues[0]!;
+    const record: DriftProperty = {
+      kind: "drift",
+      v: 1,
+      auditId: issue.property.auditId,
+      findingId: issue.property.findingId,
+      externalId: issue.property.externalId,
+      repo: issue.property.repo,
+      prId: 3,
+      commit: "a1b2c3d4e5f6",
+      files: ["src/PriceOracle.sol"],
+      checkedAt: "2026-11-24T21:00:00.000Z",
+    };
+
+    jira.driftRecords[issue.id] = signDrift(record, TEST_SECRET);
+    const view = await getPanel(deps, issue.id);
+    expect(view?.drift).toEqual({
+      prId: 3,
+      prUrl: `https://bitbucket.org/${issue.property.repo}/pull-requests/3`,
+      commit: "a1b2c3d4e5f6",
+      files: ["src/PriceOracle.sol"],
+      checkedAt: "2026-11-24T21:00:00.000Z",
+      signedOff: false,
+    });
+
+    // Hand-edited, signed with another secret, or meant for another finding: not shown.
+    jira.driftRecords[issue.id] = { ...signDrift(record, TEST_SECRET), prId: 4 };
+    expect((await getPanel(deps, issue.id))?.drift).toBeUndefined();
+    jira.driftRecords[issue.id] = signDrift(record, "cd".repeat(32));
+    expect((await getPanel(deps, issue.id))?.drift).toBeUndefined();
+    jira.driftRecords[issue.id] = signDrift({ ...record, findingId: "other" }, TEST_SECRET);
+    expect((await getPanel(deps, issue.id))?.drift).toBeUndefined();
   });
 
   it("changes status, records history and updates the issue property", async () => {

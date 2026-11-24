@@ -111,10 +111,18 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function signatureOf(property: IssueProperty, secret: string): string {
-  const unsigned: Partial<IssueProperty> = { ...property };
+function signatureOf(record: { sig?: string }, secret: string): string {
+  const unsigned: { sig?: string } = { ...record };
   delete unsigned.sig;
   return createHmac("sha256", secret).update(canonicalJson(unsigned)).digest("hex");
+}
+
+function verifySigned(record: { sig?: unknown } | null | undefined, secret: string): boolean {
+  if (!record || typeof record !== "object") return false;
+  if (typeof record.sig !== "string" || !/^[0-9a-f]{64}$/.test(record.sig)) return false;
+  const expected = Buffer.from(signatureOf(record as { sig?: string }, secret), "hex");
+  const actual = Buffer.from(record.sig, "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
 /**
@@ -133,8 +141,52 @@ export function signProperty(property: IssueProperty, secret: string): IssueProp
 
 /** True only when the property was signed with this secret and not changed since. */
 export function verifyProperty(property: IssueProperty, secret: string): boolean {
-  if (typeof property.sig !== "string" || !/^[0-9a-f]{64}$/.test(property.sig)) return false;
-  const expected = Buffer.from(signatureOf(property, secret), "hex");
-  const actual = Buffer.from(property.sig, "hex");
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+  return verifySigned(property, secret);
+}
+
+/** Issue property the Bitbucket merge check writes when a pull request changes a finding's code. */
+export const DRIFT_PROPERTY_KEY = "auditgate-drift";
+
+/**
+ * What the Bitbucket merge check last saw for one finding: a pull request changed the code the
+ * finding points at, after the audit. Signed with the same secret, and tagged `kind: "drift"` so
+ * a drift record can never pass as finding data or the other way round.
+ */
+export interface DriftProperty {
+  kind: "drift";
+  v: 1;
+  auditId: string;
+  findingId: string;
+  externalId: string;
+  /** "workspace/slug", lowercase. */
+  repo: string;
+  prId: number;
+  /** The pull request's latest commit when it was checked, as Bitbucket reported it. */
+  commit: string;
+  /** The finding's audited files that changed. At most 20. */
+  files: string[];
+  checkedAt: string;
+  sig?: string;
+}
+
+export function signDrift(record: DriftProperty, secret: string): DriftProperty {
+  return { ...record, sig: signatureOf(record, secret) };
+}
+
+/** True only for a drift record signed with this secret and not changed since. */
+export function verifyDrift(record: unknown, secret: string): record is DriftProperty {
+  const r = record as Partial<DriftProperty> | null;
+  return (
+    !!r &&
+    typeof r === "object" &&
+    r.kind === "drift" &&
+    typeof r.auditId === "string" &&
+    typeof r.findingId === "string" &&
+    typeof r.externalId === "string" &&
+    typeof r.prId === "number" &&
+    typeof r.commit === "string" &&
+    Array.isArray(r.files) &&
+    typeof r.checkedAt === "string" &&
+    verifySigned(r, secret)
+  );
 }

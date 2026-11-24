@@ -58,6 +58,21 @@ modules:
         - path: repo
           type: string
           searchAlias: auditgateRepo
+    # Written by the Bitbucket merge check when "Record drift on Jira issues" is on, for example:
+    #   auditgateDriftPr IS NOT EMPTY ORDER BY auditgateDriftAt DESC
+    - key: auditgate-drift-property
+      entityType: issue
+      propertyKey: auditgate-drift
+      values:
+        - path: prId
+          type: number
+          searchAlias: auditgateDriftPr
+        - path: commit
+          type: string
+          searchAlias: auditgateDriftCommit
+        - path: checkedAt
+          type: date
+          searchAlias: auditgateDriftAt
 
   # Rovo: an agent plus read-only actions. The same actions are exposed as MCP tools below.
   rovo:agent:

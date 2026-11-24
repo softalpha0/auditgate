@@ -40,7 +40,7 @@ The token is never shown again after saving and is never sent back to the browse
 
 ### Network access
 
-One host: `api.atlassian.com`, Atlassian's own API gateway. The app uses the saved API token to read the repository's AuditGate findings from your Jira site. It only needs the `read:jira-work` scope and never writes to Jira. It reads pull request and diff information from Bitbucket through Atlassian's APIs.
+One host: `api.atlassian.com`, Atlassian's own API gateway. The app uses the saved API token to read the repository's AuditGate findings from your Jira site. By default it only needs the `read:jira-work` scope and never writes to Jira. If a repository admin turns on "Record drift on Jira issues", the token also needs `write:jira-work`, and the app saves one issue property (`auditgate-drift`) on the issue of each finding whose code a pull request changed: the pull request number, commit hash, changed file paths and time. It writes nothing else. It reads pull request and diff information from Bitbucket through Atlassian's APIs.
 
 ## Personal data
 

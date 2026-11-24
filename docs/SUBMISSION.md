@@ -41,10 +41,10 @@ AuditGate is two Forge apps that work together: one in Jira, one in Bitbucket.
 ## How we built it
 
 - **Two Forge apps**, because one Forge app can't span Jira and Bitbucket. The Jira app uses `jira:projectPage`, `jira:issuePanel`, `jira:entityProperty`, a queue `consumer`, `rovo:agent`, `action` and `rovo:mcp`. The Bitbucket app uses `bitbucket:mergeCheck` and `bitbucket:repoSettingsMenuPage`.
-- **Shared logic in plain TypeScript packages:** report parsers, drift, the gate, and the Jira mapping. Both apps run the same gate code, so "Check a change" in Jira and the merge check in Bitbucket always agree. 203 tests, run against real Slither and Aderyn output from a demo Foundry repo with 11 planted bugs, each proved by a test.
+- **Shared logic in plain TypeScript packages:** report parsers, drift, the gate, and the Jira mapping. Both apps run the same gate code, so "Check a change" in Jira and the merge check in Bitbucket always agree. 211 tests, run against real Slither and Aderyn output from a demo Foundry repo with 11 planted bugs, each proved by a test.
 - **Imports run on a Forge queue.** Up to 50 issues per bulk call, ordered by severity so C-01 gets the first issue number. Retries are safe: before creating anything, the job adopts issues Jira already created.
 - **Signed finding data.** The Bitbucket app can only read Jira, not the Jira app's storage, so each issue carries its finding as an indexed issue property. Anyone who can edit an issue can edit its properties, so the Jira app signs each one with HMAC-SHA256. The merge check fails if any signature doesn't match. Editing an issue property by hand can't open the gate.
-- **Least access.** The Jira app has no egress and qualifies for Runs on Atlassian. The Bitbucket app calls one host, `api.atlassian.com`, with a scoped API token that only has `read:jira-work`. It never writes to Jira.
+- **Least access.** The Jira app has no egress and qualifies for Runs on Atlassian. The Bitbucket app calls one host, `api.atlassian.com`, with a scoped API token that only needs `read:jira-work`. It writes to Jira only if an admin turns on recording drift, and then only a signed `auditgate-drift` property that the issue panel shows and JQL can search.
 - CI validates both manifests and bundles both apps with the Forge CLI's own tooling on every push.
 
 ## Challenges we ran into
@@ -60,7 +60,7 @@ AuditGate is two Forge apps that work together: one in Jira, one in Bitbucket.
 - A real pull request in Bitbucket, blocked by findings that live in Jira, with each Jira issue named in the message.
 - The full loop runs on Atlassian sites: report to Jira issues, issue panel and status history, release gate, merge check.
 - A tamper-evident link between two Forge apps, without giving the Bitbucket app write access to anything.
-- 203 automated tests, and CI that builds both Forge apps with the Forge CLI's own tooling.
+- 211 automated tests, and CI that builds both Forge apps with the Forge CLI's own tooling.
 
 ## What we learned
 

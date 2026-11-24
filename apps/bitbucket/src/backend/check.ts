@@ -1,7 +1,13 @@
 import { compareSeverity } from "@auditgate/core";
 import { computeDrift, fromBitbucketDiffstat, type BitbucketDiffstatEntry } from "@auditgate/drift";
 import { evaluateGate } from "@auditgate/gate";
-import { isReviewedCommit, verifyProperty, type IssueProperty } from "@auditgate/jira";
+import {
+  isReviewedCommit,
+  signDrift,
+  verifyProperty,
+  type DriftProperty,
+  type IssueProperty,
+} from "@auditgate/jira";
 
 /**
  * The AuditGate merge check. Reads the repository's findings from Jira, checks they were signed by
@@ -18,6 +24,11 @@ export interface JiraConfig {
   email: string;
   token: string;
   signingSecret: string;
+  /**
+   * Record drift on the Jira issues. Off by default: it needs a token that can also write
+   * (write:jira-work), and the merge check works without it.
+   */
+  writeBack?: boolean;
 }
 
 export interface FindingIssue {
@@ -42,12 +53,27 @@ export interface Bitbucket {
 
 export interface Jira {
   findingsForRepo(config: JiraConfig, repo: string): Promise<FindingIssue[]>;
+  /** Saves a signed drift record on the issue. Throws CheckError when Jira refuses. */
+  recordDrift(config: JiraConfig, issueKey: string, record: DriftProperty): Promise<void>;
+}
+
+/** How the last write-back went, shown on the settings page. */
+export interface WriteBackStatus {
+  at: string;
+  prId: number;
+  commit: string;
+  written: string[];
+  failed: string[];
+  error?: string;
 }
 
 export interface CheckDeps {
   config(repoUuid: string): Promise<JiraConfig | undefined>;
   bitbucket: Bitbucket;
   jira: Jira;
+  /** Remembers the last write-back result for the settings page. */
+  saveWriteBack?(repoUuid: string, status: WriteBackStatus): Promise<void>;
+  now?(): Date;
 }
 
 export interface MergeCheckEvent {
@@ -189,5 +215,84 @@ export async function runMergeCheck(
     parts.push(`Changes up to ${head.slice(0, 7)} were signed off in a re-review.`);
   }
   parts.push(`Compared with ${audit.auditedCommit.slice(0, 7)} ("${audit.name}").`);
+
+  // A signed-off commit isn't drift any more, so there is nothing to record.
+  if (config.writeBack && !reviewed && drift.driftedFindings.length) {
+    const drifted = drift.driftedFindings.slice(0, MAX_WRITE_BACK).flatMap((d) => {
+      const f = findings.find((x) => x.p.findingId === d.id);
+      return f ? [{ key: f.key, d }] : [];
+    });
+    const at = (deps.now?.() ?? new Date()).toISOString();
+    await writeBack(deps, unwrapUuid(repoUuid), config, {
+      at,
+      prId: event.pullrequest.id,
+      commit: head,
+      records: drifted.map(({ key, d }) => ({
+        key,
+        record: signDrift(
+          {
+            kind: "drift",
+            v: 1,
+            auditId: audit.id,
+            findingId: d.id,
+            externalId: d.externalId,
+            repo,
+            prId: event.pullrequest.id,
+            commit: head.toLowerCase(),
+            files: d.files.slice(0, 20),
+            checkedAt: at,
+          },
+          config.signingSecret,
+        ),
+      })),
+    });
+  }
   return { success: gate.pass, message: parts.join(" ") };
+}
+
+/** One check writes at most this many issues, so a huge pull request can't time the check out. */
+const MAX_WRITE_BACK = 25;
+
+/**
+ * Best effort: the gate's answer never depends on it. A read-only token or a Jira hiccup is
+ * recorded for the settings page and otherwise ignored.
+ */
+async function writeBack(
+  deps: CheckDeps,
+  repoUuid: string,
+  config: JiraConfig,
+  run: {
+    at: string;
+    prId: number;
+    commit: string;
+    records: { key: string; record: DriftProperty }[];
+  },
+): Promise<void> {
+  const results = await Promise.allSettled(
+    run.records.map(({ key, record }) => deps.jira.recordDrift(config, key, record)),
+  );
+  const written: string[] = [];
+  const failed: string[] = [];
+  let error: string | undefined;
+  results.forEach((r, i) => {
+    const key = run.records[i]!.key;
+    if (r.status === "fulfilled") written.push(key);
+    else {
+      failed.push(key);
+      error ??= r.reason instanceof Error ? r.reason.message : String(r.reason);
+    }
+  });
+  const status: WriteBackStatus = {
+    at: run.at,
+    prId: run.prId,
+    commit: run.commit,
+    written,
+    failed,
+    ...(error ? { error } : {}),
+  };
+  try {
+    await deps.saveWriteBack?.(repoUuid, status);
+  } catch {
+    // The status is only shown on the settings page. Losing it must not fail the check.
+  }
 }

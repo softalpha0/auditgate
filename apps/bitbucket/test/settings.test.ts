@@ -46,7 +46,15 @@ function fake(found: FindingIssue[] | Error = issues) {
         if (found instanceof Error) throw found;
         return found;
       },
+      recordDrift: async () => {},
     },
+    lastWriteBack: async () => ({
+      at: "2026-11-24T21:00:00.000Z",
+      prId: 7,
+      commit: "a1b2c3d4e5f6",
+      written: ["KAN-14"],
+      failed: [],
+    }),
   };
   return { d, saved };
 }
@@ -91,12 +99,23 @@ describe("settings page", () => {
       findings: 11,
       audits: ["Vault v2 audit"],
     });
-    expect(saved.get("r1")).toEqual(input);
+    expect(saved.get("r1")).toEqual({ ...input, writeBack: false });
     expect(await getSettings(d, where)).toEqual({
       repo: where.repo,
       connected: true,
       cloudId: CLOUD,
       email: "me@example.com",
+      writeBack: false,
+    });
+  });
+
+  it("saves the write-back choice and shows how the last write-back went", async () => {
+    const { d, saved } = fake();
+    await saveSettings(d, where, { ...input, writeBack: true });
+    expect(saved.get("r1")?.writeBack).toBe(true);
+    expect(await getSettings(d, where)).toMatchObject({
+      writeBack: true,
+      lastWriteBack: { prId: 7, written: ["KAN-14"] },
     });
   });
 
@@ -110,7 +129,7 @@ describe("settings page", () => {
       token: "",
       signingSecret: "",
     });
-    expect(saved.get("r1")).toEqual({ ...input, email: "new@example.com" });
+    expect(saved.get("r1")).toEqual({ ...input, email: "new@example.com", writeBack: false });
   });
 
   it("lists every problem with the form at once and saves nothing", async () => {

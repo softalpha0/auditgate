@@ -57,6 +57,8 @@ export interface Jira {
   editPriorities(issueKey: string): Promise<{ id: string; name: string }[] | undefined>;
   setPriority(issueKey: string, priorityId: string): Promise<void>;
   setFindingProperty(issueKey: string, value: IssueProperty): Promise<void>;
+  /** The drift record the Bitbucket merge check saved on the issue, unverified, if any. */
+  getDriftRecord(issueId: string): Promise<unknown>;
   /** Issues already carrying this audit's property. Used to recover after a crash mid-import. */
   findAuditIssues(auditId: string): Promise<{ id: string; key: string; findingId: string }[]>;
   /** Display name of each issue's assignee, or null when unassigned. */
