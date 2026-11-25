@@ -131,3 +131,7 @@ Built `apps/bitbucket` (merge check plus a repository settings page) and the Jir
 ### 24 Nov: re-review sign-off, Rovo skill, drift recorded in Jira
 
 Re-review sign-off, the `auditgate-release-check` Rovo skill and the Marketplace pack were deployed (Jira app and Bitbucket app 2.2.0). Then optional drift write-back: with "Record drift on Jira issues" on and a token that can write, the merge check saves a signed `auditgate-drift` property on each drifted finding's issue. The Jira issue panel shows it only when the signature, audit and finding match, and JQL can search it (`auditgateDriftPr`, `auditgateDriftCommit`, `auditgateDriftAt`). The merge check's verdict never depends on the write. 211 tests pass.
+
+### 25 Nov: the full loop, live
+
+On pull request #1 in auditgate-demo/vault-v2: the merge check blocked on push and recorded drift on 7 Jira issues (KAN-13 to 16, 19, 20, 22; checked with JQL `auditgateDriftPr = 1` through the Atlassian MCP server). C-01 and H-01 to H-03 were marked fixed, a re-review was signed off at `a0ec94d`, the signed issue data picked up the reviewed commit, and the check passed on merge. Rovo agents and the external MCP tools switch aren't available on softalpha-dev, so those stay untested live; the Codegeist team confirmed judges' sites have Rovo. The signing secret field on the Bitbucket settings page is now plain text, because Chrome filled a saved password into it.

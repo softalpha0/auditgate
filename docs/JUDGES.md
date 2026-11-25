@@ -1,6 +1,8 @@
 # Testing AuditGate (for judges)
 
-About 10 minutes. You need a Jira Cloud site where you're an admin. A free developer site from <https://go.atlassian.com/cloud-dev> works.
+About 10 minutes for Jira, 15 more for Bitbucket. You need a Jira Cloud site where you're an admin. Sections 1 to 5 work on any site. Section 6 needs a Bitbucket workspace, and section 7 needs Rovo, which your test sites have.
+
+AuditGate is two Forge apps, because one Forge app can't run in both Jira and Bitbucket: **AuditGate** for Jira and **AuditGate for Bitbucket**. Both install links are in the Devpost submission.
 
 ## 1. Install
 
@@ -55,25 +57,48 @@ Upload the same report again under **Re-import the report**. AuditGate reports "
 
 ## 6. The Bitbucket merge check
 
-**See it without setting anything up.** Pull request #1 in the demo repo fixes H-01 and is blocked by AuditGate: <https://bitbucket.org/auditgate-demo/vault-v2/pull-requests/1>. In the right sidebar, click the **AuditGate** check under "Checks". The message reads:
+**See it without setting anything up.** Pull request #1 in the demo repo went through the whole loop on 24 and 25 November 2026: <https://bitbucket.org/auditgate-demo/vault-v2/pull-requests/1>. In the right sidebar, click each **AuditGate** result.
 
-> Blocked by AuditGate: 4 open (C-01, H-01, H-02, H-03), 1 audited file changed without re-review (src/TokenVault.sol). Jira: C-01 KAN-12, H-01 KAN-13, H-02 KAN-14, H-03 KAN-15. Compared with 16b9a19 ("Vault v2 audit").
+1. On each push, the check failed:
+
+   > Blocked by AuditGate: 4 open (C-01, H-01, H-02, H-03), 1 audited file changed without re-review (src/TokenVault.sol). Jira: C-01 KAN-12, H-01 KAN-13, H-02 KAN-14, H-03 KAN-15. Compared with 16b9a19 ("Vault v2 audit").
+
+2. The check also recorded the drift on the 7 affected Jira issues. Their AuditGate panel said "A pull request changed this finding's code", with the pull request and commit.
+3. The four serious findings were marked fixed in Jira, and a project admin signed off a re-review at the pull request's head commit, `a0ec94d`.
+4. On merge, the check passed:
+
+   > AuditGate: no open Critical or High findings. Changes up to a0ec94d were signed off in a re-review. Compared with 16b9a19 ("Vault v2 audit").
+
+Our workspace is on the Free plan, so Bitbucket labels the check "recommended". On a Premium workspace with the check set to **Required**, the first result blocks the Merge button.
 
 **Run it yourself.** Install AuditGate for Bitbucket on a shared (team) workspace and follow [`BITBUCKET.md`](BITBUCKET.md), about 15 minutes. In short:
 
 1. Push the demo contracts to a repo and create the audit in Jira with that commit.
 2. In Jira, AuditGate tab, click **Connect Bitbucket** and copy the site ID and signing secret.
 3. In the repo, **Repository settings** > **AuditGate**: paste them with your email and an API token that has only `read:jira-work`, then **Check and save**.
-4. Turn on **Custom merge checks** for the workspace and add the AuditGate check to the repo.
+4. Turn on **Custom merge checks** for the workspace and add the AuditGate check to the repo. On Premium, tick **Required** so a failing check blocks the merge.
 5. Open a pull request that edits `src/TokenVault.sol`. The check fails and names the blocking findings.
 
 By default the Bitbucket app reads Jira and never writes to it. To see drift recorded on the issues, tick **Record drift on Jira issues** in the settings and use a token that also has `write:jira-work`; after the next push to the pull request, open KAN-14 and the AuditGate panel shows the pull request and commit. It rejects finding data that has been edited by hand, because the Jira app signs it.
 
 **Clear the gate.** In Jira, move C-01 and H-01 to H-03 to **Mark as fixed** (or accept a risk with a reason and an approver). Then, on the audit page, use **Re-review sign-off** with the pull request's head commit (in Bitbucket, the PR's latest commit, all 40 characters) and a note. Those findings become Verified. Push any small commit to the pull request, or click **Merge** to re-run the check: it passes for the signed-off commit and says the changes were signed off in a re-review.
 
+## 7. Rovo agent and MCP tools
+
+These need Rovo. We couldn't run them on our own test site, which doesn't have Rovo agents, so this section hasn't been tried end to end. The actions call the same code as the gate in sections 2 to 4, and that code is covered by the test suite.
+
+**Rovo agent.** In Rovo chat, pick the **AuditGate** agent and try a conversation starter: "Is the latest release safe to ship?", "Summarize open audit findings by severity" or "Who owns H-03?". The agent answers only from its four read-only actions and cites Jira keys. For "What changed since the audit?" it asks for the changed files and gives the `git diff` command.
+
+**MCP tools.** External MCP access is off by default.
+
+1. In Atlassian Administration, go to **Apps > Sites > your site > Connected apps > AuditGate**, and turn on its four tools: release readiness, list open findings, get finding, check drift.
+2. Add `https://mcp.atlassian.com/forge/dc6e5d7c-6f3b-4766-af94-425ef105f7a4` as a remote MCP server in your client (Claude, Claude Code, Cursor and others), and approve access for your site.
+3. Ask the same questions. `skills/auditgate/SKILL.md` in the repository tells an agent when to use each tool.
+
 ## Known limitations
 
-- In Bitbucket, a custom merge check can block a merge only on the Premium plan. On Free and Standard it runs and shows a failing check with the full message, but Bitbucket doesn't stop the merge.
+- In Bitbucket, a custom merge check can block a merge only on the Premium plan, with the check set to Required. On Free and Standard it runs and shows the full result, but Bitbucket doesn't stop the merge.
+- The Rovo agent and MCP tools need a site with Rovo. They're untested on a live Rovo site (see section 7).
 - The check runs on new pushes to a pull request and on merge. A pull request opened from a branch that already existed gets its first result on the next push or merge attempt.
 - Each new commit that touches audited code needs its own re-review sign-off. That is deliberate: a sign-off covers exactly the code someone reviewed.
 - Supported report formats: Markdown in the template at `demo/reports/TEMPLATE.md`, Slither JSON, and Aderyn JSON. No PDF import.

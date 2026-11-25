@@ -1,6 +1,6 @@
 # Devpost submission
 
-Rewritten 20 Nov 2026 from what runs on softalpha-dev and the auditgate-demo Bitbucket workspace. Every section is ready to paste. Brackets mark the three things that don't exist yet: the video, the Bitbucket install link and the Marketplace listing. Facts about Nomad come from `RESEARCH.md`.
+Rewritten 20 Nov 2026 and updated 25 Nov from what runs on softalpha-dev and the auditgate-demo Bitbucket workspace. Every section is ready to paste. Brackets mark the three things that don't exist yet: the video, the Bitbucket install link and the Marketplace listing. Facts about Nomad come from `RESEARCH.md`.
 
 ## Project name
 
@@ -34,9 +34,13 @@ AuditGate is two Forge apps that work together: one in Jira, one in Bitbucket.
 
    > Blocked by AuditGate: 4 open (C-01, H-01, H-02, H-03), 1 audited file changed without re-review (src/TokenVault.sol). Jira: C-01 KAN-12, H-01 KAN-13, H-02 KAN-14, H-03 KAN-15. Compared with 16b9a19 ("Vault v2 audit").
 
-5. **Clear the gate.** A project admin signs off a re-review at a specific commit, normally the head of the pull request. Findings marked fixed become Verified, and the merge check passes for exactly that commit if no Critical or High finding is still open. The next commit that touches audited code needs a new sign-off.
-6. **Rovo agent.** An AuditGate agent with four read-only actions: release readiness, open findings, one finding's details and history, and drift for a list of changed files. It answers only from action results and cites Jira keys.
-7. **MCP tools.** The same four actions are exposed as `rovo:mcp` tools for Rovo Studio agents and outside MCP clients, with an open-source `skill.md` that teaches an agent when to use them.
+5. **Record drift in Jira.** Optionally, the merge check marks each affected finding's Jira issue with the pull request, commit and changed files. The issue panel shows "A pull request changed this finding's code", and JQL finds them all: `auditgateDriftPr = 1`.
+6. **Clear the gate.** A project admin signs off a re-review at a specific commit, normally the head of the pull request. Findings marked fixed become Verified, and the merge check passes for exactly that commit if no Critical or High finding is still open. The next commit that touches audited code needs a new sign-off. On the same pull request, after sign-off, the check said:
+
+   > AuditGate: no open Critical or High findings. Changes up to a0ec94d were signed off in a re-review. Compared with 16b9a19 ("Vault v2 audit").
+
+7. **Rovo agent.** An AuditGate agent with four read-only actions: release readiness, open findings, one finding's details and history, and drift for a list of changed files. It answers only from action results and cites Jira keys.
+8. **MCP tools.** The same four actions are exposed as `rovo:mcp` tools for Rovo Studio agents and outside MCP clients, with an open-source `skill.md` that teaches an agent when to use them.
 
 ## How we built it
 
@@ -57,8 +61,8 @@ AuditGate is two Forge apps that work together: one in Jira, one in Bitbucket.
 
 ## Accomplishments that we're proud of
 
-- A real pull request in Bitbucket, blocked by findings that live in Jira, with each Jira issue named in the message.
-- The full loop runs on Atlassian sites: report to Jira issues, issue panel and status history, release gate, merge check.
+- The full loop on a real pull request: blocked by findings that live in Jira, drift recorded on 7 Jira issues, four findings fixed, a re-review signed off at the exact commit, and the same check passing on merge.
+- The gate sits where teams already work. Nobody has to open a new tool or remember to ask a chat window before merging.
 - A tamper-evident link between two Forge apps, without giving the Bitbucket app write access to anything.
 - 211 automated tests, and CI that builds both Forge apps with the Forge CLI's own tooling.
 
@@ -70,7 +74,7 @@ AuditGate is two Forge apps that work together: one in Jira, one in Bitbucket.
 
 ## What's next
 
-- Writing drift results back to Jira from the merge check.
+- Telling the merge check who owns each blocking finding and who last changed the code, using Teamwork Graph.
 - Comparing deployed bytecode with the audited commit after deployment.
 - GitHub and GitLab support.
 
@@ -80,7 +84,7 @@ AuditGate is built entirely on Forge. The Jira app adds a project page (`jira:pr
 
 ## Bonus prize write-ups
 
-**Best Agents.** The app ships a `rovo:agent`, four `action` modules and a `rovo:skill` (`auditgate-release-check`) that tells the agent which action to use and how to read its results. The AuditGate agent answers release questions from live data: "Is the latest release safe to ship?", "Summarize open audit findings by severity", "What changed since the audit?", "Who owns H-03?". Its four actions are read-only, check that the user can browse the project before answering, and return small, plain results. The prompt tells the agent to answer only from action results, to cite Jira keys, and never to call a finding Verified. When a question needs the list of changed files, the agent asks for it and gives the exact `git diff` command.
+**Best Agents.** The app ships a `rovo:agent`, four `action` modules and a `rovo:skill` (`auditgate-release-check`) that tells the agent which action to use and how to read its results. The AuditGate agent answers release questions from live data: "Is the latest release safe to ship?", "Summarize open audit findings by severity", "What changed since the audit?", "Who owns H-03?". Its four actions are read-only, check that the user can browse the project before answering, and return small, plain results. The prompt tells the agent to answer only from action results, to cite Jira keys, and never to call a finding Verified. When a question needs the list of changed files, the agent asks for it and gives the exact `git diff` command. Our own test site doesn't have Rovo agents, so we tested the actions' logic through the test suite and the Jira app, which call the same code; the agent itself is untested on a live Rovo site.
 
 **Best app with Atlassian MCP.** The four actions are exposed through `rovo:mcp`, so Rovo Studio agents and outside MCP clients can ask the same questions. The repository includes `skills/auditgate/SKILL.md`, which tells an agent when to call each tool. We also used the Atlassian MCP server during the build, to read issue properties and edit metadata on the live site. That is how we found and fixed the priority bug.
 
@@ -90,12 +94,15 @@ AuditGate is built entirely on Forge. The Jira app adds a project page (`jira:pr
 
 Short version of `docs/JUDGES.md` and `docs/BITBUCKET.md`:
 
-1. Install AuditGate in Jira with the link below.
+There are two install links, because one Forge app can't run in both Jira and Bitbucket.
+
+1. Install AuditGate in Jira with the first link below.
 2. In a Jira project, open the AuditGate tab, click New audit and upload `demo/reports/vault-v2-audit.md` from the repository. It creates 11 issues.
 3. Open any issue to see the AuditGate panel. Use "Check a change" on the audit page to see the gate without Bitbucket.
-4. For the merge check, install AuditGate for Bitbucket on a shared workspace, then follow `docs/BITBUCKET.md`.
+4. For the merge check, install AuditGate for Bitbucket on a shared workspace with the second link, then follow `docs/BITBUCKET.md`. On Premium, set the check to Required so it blocks the merge.
+5. For the MCP tools, turn them on under Apps > Sites > your site > Connected apps > AuditGate.
 
-The merge check blocks merges only on Bitbucket Premium. On Free and Standard it runs and shows a failing check with the full message, but Bitbucket doesn't stop the merge.
+Pull request #1 in the public demo repo shows both results without any setup: blocked on push, passed on merge after sign-off.
 
 ## Links
 

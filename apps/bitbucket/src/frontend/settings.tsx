@@ -159,9 +159,13 @@ const Settings = () => {
           </Stack>
           <Stack space="space.050">
             <Label labelFor="secret">Signing secret</Label>
+            {/* Plain text on purpose: browsers put saved passwords into password fields, and a
+                filled-in password here fails the check. The secret is shown in Jira anyway. */}
             <Textfield
               id="secret"
-              type="password"
+              name="auditgate-signing-secret"
+              isMonospaced
+              placeholder={status.connected ? "Saved. Paste a new one to replace it." : ""}
               value={form.signingSecret}
               onChange={set("signingSecret")}
             />
@@ -173,9 +177,17 @@ const Settings = () => {
           </Stack>
           <Stack space="space.050">
             <Label labelFor="token">API token</Label>
-            <Textfield id="token" type="password" value={form.token} onChange={set("token")} />
+            <Textfield
+              id="token"
+              name="auditgate-jira-api-token"
+              type="password"
+              value={form.token}
+              onChange={set("token")}
+            />
             <HelperMessage>
-              {`Create a token with the scope read:jira-work${form.writeBack ? " and write:jira-work" : " only"}. ${keep ?? ""}`.trim()}
+              {`Create a token with the scope read:jira-work${form.writeBack ? " and write:jira-work" : " only"}. ${keep ?? ""} If your browser fills this box in by itself, clear it: it needs the API token, not your password.`
+                .replace(/\s+/g, " ")
+                .trim()}
             </HelperMessage>
             <Link href="https://id.atlassian.com/manage-profile/security/api-tokens" openNewTab>
               Create an API token
